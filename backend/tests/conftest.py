@@ -1,5 +1,5 @@
 import pytest_asyncio
-from backend.app.main import app, lifespan
+from app.main import app, lifespan
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)

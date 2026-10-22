@@ -3,17 +3,17 @@ from datetime import timedelta, datetime, timezone, date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from backend.app.core.database import get_db
-from backend.app.models.reproduction import MatingEvent, Pregnancy, Birth, Offspring
-from backend.app.models.animal import Animal
-from backend.app.models.task_notification import Task, Notification
-from backend.app.models.user import User
-from backend.app.schemas.reproduction import (
+from app.core.database import get_db
+from app.models.reproduction import MatingEvent, Pregnancy, Birth, Offspring
+from app.models.animal import Animal
+from app.models.task_notification import Task, Notification
+from app.models.user import User
+from app.schemas.reproduction import (
     MatingEventCreate, MatingEventOut,
     PregnancyCreate, PregnancyOut, PregnancyUpdate, GestationTimelineItem,
     BirthCreate, BirthOut
 )
-from backend.app.api.deps import get_current_user
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/reproduction", tags=["Reproduction & Généalogie"])
 

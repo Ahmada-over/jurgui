@@ -2,11 +2,11 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from backend.app.core.database import get_db
-from backend.app.models.breed import Breed
-from backend.app.models.user import User
-from backend.app.schemas.breed import BreedCreate, BreedOut, BreedUpdate
-from backend.app.api.deps import get_current_user, get_current_admin
+from app.core.database import get_db
+from app.models.breed import Breed
+from app.models.user import User
+from app.schemas.breed import BreedCreate, BreedOut, BreedUpdate
+from app.api.deps import get_current_user, get_current_admin
 
 router = APIRouter(prefix="/breeds", tags=["Races Ovines"])
 

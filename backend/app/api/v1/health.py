@@ -4,17 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from backend.app.core.database import get_db
-from backend.app.models.health import HealthRecord, Treatment, Vaccination, HygieneTask
-from backend.app.models.animal import Animal
-from backend.app.models.sector import Sector
-from backend.app.models.user import User
-from backend.app.schemas.health import (
+from app.core.database import get_db
+from app.models.health import HealthRecord, Treatment, Vaccination, HygieneTask
+from app.models.animal import Animal
+from app.models.sector import Sector
+from app.models.user import User
+from app.schemas.health import (
     HealthRecordCreate, HealthRecordOut,
     VaccinationCreate, VaccinationOut,
     HygieneTaskCreate, HygieneTaskOut
 )
-from backend.app.api.deps import get_current_user
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/health", tags=["Santé animale & Hygiène"])
 

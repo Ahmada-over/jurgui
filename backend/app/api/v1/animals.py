@@ -4,19 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
-from backend.app.core.database import get_db
-from backend.app.models.animal import Animal, AnimalMovement, WeightRecord, BodyConditionRecord
-from backend.app.models.breed import Breed
-from backend.app.models.sector import Sector
-from backend.app.models.user import User
-from backend.app.schemas.animal import (
+from app.core.database import get_db
+from app.models.animal import Animal, AnimalMovement, WeightRecord, BodyConditionRecord
+from app.models.breed import Breed
+from app.models.sector import Sector
+from app.models.user import User
+from app.schemas.animal import (
     AnimalCreate, AnimalOut, AnimalUpdate, AnimalDetailOut,
     AnimalMovementCreate, AnimalMovementOut,
     WeightRecordCreate, WeightRecordOut,
     BodyConditionRecordCreate, BodyConditionRecordOut,
     AnimalGenealogyOut, AnimalParentOut
 )
-from backend.app.api.deps import get_current_user
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/animals", tags=["Cheptel & Animaux"])
 

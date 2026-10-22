@@ -3,16 +3,16 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from backend.app.core.database import get_db
-from backend.app.models.animal import Animal
-from backend.app.models.breed import Breed
-from backend.app.models.sector import Sector
-from backend.app.models.reproduction import Pregnancy
-from backend.app.models.feed import FeedProduct
-from backend.app.models.task_notification import Task
-from backend.app.models.health import HealthRecord
-from backend.app.models.user import User
-from backend.app.api.deps import get_current_user
+from app.core.database import get_db
+from app.models.animal import Animal
+from app.models.breed import Breed
+from app.models.sector import Sector
+from app.models.reproduction import Pregnancy
+from app.models.feed import FeedProduct
+from app.models.task_notification import Task
+from app.models.health import HealthRecord
+from app.models.user import User
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/dashboard", tags=["Tableau de Bord & Statistiques"])
 

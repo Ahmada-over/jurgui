@@ -3,11 +3,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from backend.app.core.database import get_db
-from backend.app.models.task_notification import Task, Notification
-from backend.app.models.user import User
-from backend.app.schemas.task import TaskCreate, TaskOut, TaskUpdate, NotificationOut
-from backend.app.api.deps import get_current_user
+from app.core.database import get_db
+from app.models.task_notification import Task, Notification
+from app.models.user import User
+from app.schemas.task import TaskCreate, TaskOut, TaskUpdate, NotificationOut
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/tasks", tags=["Tâches & Notifications"])
 

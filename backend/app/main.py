@@ -3,25 +3,25 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
-from backend.app.core.config import settings
-from backend.app.core.database import engine, Base, AsyncSessionLocal
-from backend.app.core.security import get_password_hash
-import backend.app.models  # Ensures all 24 models are registered on Base.metadata
-from backend.app.models.user import User, UserRole
-from backend.app.models.breed import Breed
-from backend.app.models.sector import Sector
-from backend.app.models.feed import FeedProduct
+from app.core.config import settings
+from app.core.database import engine, Base, AsyncSessionLocal
+from app.core.security import get_password_hash
+import app.models  # Ensures all 24 models are registered on Base.metadata
+from app.models.user import User, UserRole
+from app.models.breed import Breed
+from app.models.sector import Sector
+from app.models.feed import FeedProduct
 
-from backend.app.api.v1.auth import router as auth_router
-from backend.app.api.v1.breeds import router as breeds_router
-from backend.app.api.v1.sectors import router as sectors_router
-from backend.app.api.v1.animals import router as animals_router
-from backend.app.api.v1.reproduction import router as reproduction_router
-from backend.app.api.v1.feed import router as feed_router
-from backend.app.api.v1.health import router as health_router
-from backend.app.api.v1.tasks import router as tasks_router
-from backend.app.api.v1.finances import router as finances_router
-from backend.app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.auth import router as auth_router
+from app.api.v1.breeds import router as breeds_router
+from app.api.v1.sectors import router as sectors_router
+from app.api.v1.animals import router as animals_router
+from app.api.v1.reproduction import router as reproduction_router
+from app.api.v1.feed import router as feed_router
+from app.api.v1.health import router as health_router
+from app.api.v1.tasks import router as tasks_router
+from app.api.v1.finances import router as finances_router
+from app.api.v1.dashboard import router as dashboard_router
 
 
 @asynccontextmanager

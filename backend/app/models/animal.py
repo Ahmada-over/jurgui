@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, date
 from sqlalchemy import Column, Integer, String, Text, Float, Date, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.orm import relationship
-from backend.app.core.database import Base
+from app.core.database import Base
 
 
 class Animal(Base):

@@ -3,12 +3,12 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from backend.app.core.database import get_db
-from backend.app.models.finance import Expense, Revenue
-from backend.app.models.animal import Animal
-from backend.app.models.user import User
-from backend.app.schemas.finance import ExpenseCreate, ExpenseOut, RevenueCreate, RevenueOut, FinancialSummaryOut
-from backend.app.api.deps import get_current_user, get_current_admin
+from app.core.database import get_db
+from app.models.finance import Expense, Revenue
+from app.models.animal import Animal
+from app.models.user import User
+from app.schemas.finance import ExpenseCreate, ExpenseOut, RevenueCreate, RevenueOut, FinancialSummaryOut
+from app.api.deps import get_current_user, get_current_admin
 
 router = APIRouter(prefix="/finances", tags=["Finances (FCFA)"])
 

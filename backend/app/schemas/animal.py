@@ -1,8 +1,8 @@
 from typing import Optional, List
 from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, field_validator
-from backend.app.schemas.breed import BreedOut
-from backend.app.schemas.sector import SectorOut
+from app.schemas.breed import BreedOut
+from app.schemas.sector import SectorOut
 
 
 class WeightRecordBase(BaseModel):

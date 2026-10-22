@@ -1,7 +1,7 @@
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
-from backend.app.core.config import settings
+from app.core.config import settings
 
 # In SQLite, connect_args is needed for foreign key enforcement
 connect_args = {"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}

@@ -2,12 +2,12 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from backend.app.core.database import get_db
-from backend.app.models.sector import Sector
-from backend.app.models.animal import Animal
-from backend.app.models.user import User
-from backend.app.schemas.sector import SectorCreate, SectorOut, SectorUpdate
-from backend.app.api.deps import get_current_user, get_current_admin
+from app.core.database import get_db
+from app.models.sector import Sector
+from app.models.animal import Animal
+from app.models.user import User
+from app.schemas.sector import SectorCreate, SectorOut, SectorUpdate
+from app.api.deps import get_current_user, get_current_admin
 
 router = APIRouter(prefix="/sectors", tags=["Secteurs & Enclos"])
 

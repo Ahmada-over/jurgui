@@ -4,15 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from backend.app.core.database import get_db
-from backend.app.models.feed import FeedProduct, FeedRation, RationItem, FeedingRecord, InventoryMovement
-from backend.app.models.user import User
-from backend.app.schemas.feed import (
+from app.core.database import get_db
+from app.models.feed import FeedProduct, FeedRation, RationItem, FeedingRecord, InventoryMovement
+from app.models.user import User
+from app.schemas.feed import (
     FeedProductCreate, FeedProductOut, FeedProductUpdate,
     InventoryMovementCreate, InventoryMovementOut,
     FeedRationCreate, FeedRationOut, RationItemOut
 )
-from backend.app.api.deps import get_current_user
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/feed", tags=["Nutrition & Stocks"])
 

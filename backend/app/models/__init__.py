@@ -1,14 +1,14 @@
-from backend.app.core.database import Base
-from backend.app.models.user import User, UserRole
-from backend.app.models.breed import Breed
-from backend.app.models.sector import Sector
-from backend.app.models.animal import Animal, AnimalMovement, WeightRecord, BodyConditionRecord
-from backend.app.models.reproduction import MatingEvent, Pregnancy, Birth, Offspring
-from backend.app.models.feed import FeedProduct, FeedRation, RationItem, FeedingRecord, InventoryMovement
-from backend.app.models.health import HealthRecord, Treatment, Vaccination, HygieneTask
-from backend.app.models.task_notification import Task, Notification
-from backend.app.models.finance import Expense, Revenue
-from backend.app.models.audit import AuditLog, Attachment
+from app.core.database import Base
+from app.models.user import User, UserRole
+from app.models.breed import Breed
+from app.models.sector import Sector
+from app.models.animal import Animal, AnimalMovement, WeightRecord, BodyConditionRecord
+from app.models.reproduction import MatingEvent, Pregnancy, Birth, Offspring
+from app.models.feed import FeedProduct, FeedRation, RationItem, FeedingRecord, InventoryMovement
+from app.models.health import HealthRecord, Treatment, Vaccination, HygieneTask
+from app.models.task_notification import Task, Notification
+from app.models.finance import Expense, Revenue
+from app.models.audit import AuditLog, Attachment
 
 __all__ = [
     "Base",

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime
-from backend.app.core.database import Base
+from app.core.database import Base
 
 
 class Breed(Base):
