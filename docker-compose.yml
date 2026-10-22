@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: jurgui-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jurgui}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jurgui_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-jurgui_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: jurgui-api
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-jurgui}:${POSTGRES_PASSWORD:-jurgui_secret_2026}@db:5432/${POSTGRES_DB:-jurgui_db}
+      - SECRET_KEY=${SECRET_KEY:-dakar-ladoum-jur-gui-super-secret-key-2026-production-ready}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
