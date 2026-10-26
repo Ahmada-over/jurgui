@@ -46,7 +46,7 @@ fi
 
 # 3. Build & Push
 echo "🐳 Build de l'image Docker..."
-docker build -t "${IMAGE}:latest" -f backend/Dockerfile .
+docker build -t "${IMAGE}:latest" -f backend/Dockerfile backend
 
 echo "📤 Push vers Container Registry..."
 docker push "${IMAGE}:latest"

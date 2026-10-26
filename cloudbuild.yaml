@@ -21,7 +21,7 @@ steps:
       - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest'
       - '-f'
       - 'backend/Dockerfile'
-      - '.'
+      - 'backend'
 
   # 2. Push image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
