@@ -7,7 +7,11 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Mobile</string>
+	<string>Jur-gui</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Jur-gui utilise l'appareil photo pour photographier et identifier vos ovins.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Jur-gui accède à votre galerie pour associer une photo à la fiche d'un ovin.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

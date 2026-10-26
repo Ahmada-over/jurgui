@@ -11,7 +11,7 @@ class Animal(Base):
     id = Column(String(50), primary_key=True, index=True)
     name = Column(String(100), index=True, nullable=False)
     physical_tag = Column(String(100), unique=True, index=True, nullable=True)  # Boucle / bague
-    photo_url = Column(String(500), nullable=True)
+    photo_url = Column(Text, nullable=True)
     
     breed_id = Column(Integer, ForeignKey("breeds.id"), nullable=False)
     sex = Column(String(10), nullable=False)  # male / female

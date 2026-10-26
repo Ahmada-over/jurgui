@@ -3,7 +3,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/colors.dart';
-import '../../core/utils/formatters.dart';
+import '../../core/widgets/animal_photo_avatar.dart';
+import '../../core/widgets/error_retry_card.dart';
 import '../../core/widgets/sheep_hoof_icon.dart';
 import '../../models/animal.dart';
 import '../../providers/animals_provider.dart';
@@ -29,14 +30,17 @@ class AnimalsListScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         icon: const Icon(LucideIcons.plus),
         label: const Text(
-          'Ajouter un ovin',
-          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.2),
+          'Enregistrer un ovin',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         onPressed: () => context.push('/animals/add'),
       ),
       body: Column(
         children: [
-          // Sleek 2026 Search & Filter Header
+          // Recherche & Filtres
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: Column(
@@ -87,7 +91,7 @@ class AnimalsListScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Breed Selector Pills
+                // Filtres par race
                 breedsAsync.when(
                   data: (breeds) => SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -97,7 +101,6 @@ class AnimalsListScreen extends ConsumerWidget {
                         _buildFilterPill(
                           label: 'Tout le cheptel',
                           isSelected: filter.breedId == null,
-                          color: AppColors.primary,
                           onTap: () {
                             ref
                                 .read(animalsFilterProvider.notifier)
@@ -111,7 +114,6 @@ class AnimalsListScreen extends ConsumerWidget {
                             child: _buildFilterPill(
                               label: b.name,
                               isSelected: filter.breedId == b.id,
-                              color: Formatters.getBreedColor(b.name),
                               onTap: () {
                                 ref
                                     .read(animalsFilterProvider.notifier)
@@ -137,76 +139,66 @@ class AnimalsListScreen extends ConsumerWidget {
             ),
           ),
 
-          // Animals List
+          // Liste des ovins
           Expanded(
             child: RefreshIndicator(
-              color: AppColors.primaryAccent,
+              color: AppColors.primary,
               onRefresh: () async => ref.refresh(animalsListProvider),
               child: animalsAsync.when(
                 loading: () => const Center(
                   child: CircularProgressIndicator(
-                    color: AppColors.primaryAccent,
+                    color: AppColors.primary,
                   ),
                 ),
-                error: (err, _) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          LucideIcons.circleAlert,
-                          size: 44,
-                          color: AppColors.danger,
-                        ),
-                        const SizedBox(height: 10),
-                        Text('Erreur: $err'),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () => ref.refresh(animalsListProvider),
-                          child: const Text('Réessayer'),
-                        ),
-                      ],
-                    ),
-                  ),
+                error: (err, _) => ErrorRetryCard(
+                  message: 'Impossible de charger le cheptel : $err',
+                  onRetry: () => ref.refresh(animalsListProvider),
                 ),
                 data: (animals) {
                   if (animals.isEmpty) {
                     return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryContainer.withValues(
-                                alpha: 0.5,
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: const BoxDecoration(
+                                color: AppColors.primaryContainer,
+                                shape: BoxShape.circle,
                               ),
-                              shape: BoxShape.circle,
+                              child: const SheepHoofIcon(
+                                size: 48,
+                                color: AppColors.primary,
+                              ),
                             ),
-                            child: const SheepHoofIcon(
-                              size: 54,
-                              color: AppColors.primary,
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Aucun ovin enregistré',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Aucun ovin trouvé',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Commencez par ajouter votre premier ovin au registre.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Ajoutez une tête au cheptel via le bouton flottant.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
+                            const SizedBox(height: 18),
+                            ElevatedButton.icon(
+                              onPressed: () => context.push('/animals/add'),
+                              icon: const Icon(LucideIcons.plus, size: 18),
+                              label: const Text('Enregistrer un ovin'),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   }
@@ -217,7 +209,7 @@ class AnimalsListScreen extends ConsumerWidget {
                     itemCount: animals.length,
                     itemBuilder: (context, index) {
                       final animal = animals[index];
-                      return _build2026AnimalCard(context, animal);
+                      return _buildAnimalCard(context, animal);
                     },
                   );
                 },
@@ -232,87 +224,97 @@ class AnimalsListScreen extends ConsumerWidget {
   Widget _buildFilterPill({
     required String label,
     required bool isSelected,
-    required Color color,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
-          color: isSelected ? color : Colors.white,
+          color: isSelected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? color : AppColors.divider,
+            color: isSelected ? AppColors.primary : AppColors.divider,
             width: isSelected ? 1.5 : 1,
           ),
-          boxShadow: isSelected ? AppColors.softShadow : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected ? Colors.white : AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+            color: isSelected ? Colors.white : AppColors.textPrimary,
           ),
         ),
       ),
     );
   }
 
-  Widget _build2026AnimalCard(BuildContext context, Animal animal) {
-    final breedName = animal.breed?.name ?? 'Race inconnue';
-    final breedColor = Formatters.getBreedColor(breedName);
-    final sectorName = animal.currentSector?.name ?? 'Enclos non défini';
+  /// Carte ovin : Photo -> Nom en grand -> Boucle -> Poids
+  Widget _buildAnimalCard(BuildContext context, Animal animal) {
+    final breedName = animal.breed?.name ?? 'Race non précisée';
+    final sectorName = animal.currentSector?.name ?? 'Sans enclos';
     final isLadoum =
         breedName.toLowerCase().contains('ladoum') &&
         !breedName.toLowerCase().contains('métis');
+    final tagLabel =
+        animal.physicalTag != null && animal.physicalTag!.isNotEmpty
+            ? 'Boucle : ${animal.physicalTag} (${animal.id})'
+            : 'Boucle / ID : ${animal.id}';
+    final weightLabel = animal.currentWeightKg != null
+        ? '${animal.currentWeightKg!.toStringAsFixed(1)} kg'
+        : 'Non pesé';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isLadoum
-              ? AppColors.gold.withValues(alpha: 0.35)
-              : AppColors.divider,
-          width: isLadoum ? 1.2 : 0.8,
+          color: AppColors.divider,
+          width: 1,
         ),
         boxShadow: AppColors.softShadow,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(22),
           onTap: () => context.push('/animals/${animal.id}'),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Avatar with luxury prestige ring
+                // 1. Photo de l'ovin
                 Container(
-                  padding: const EdgeInsets.all(3),
+                  width: 68,
+                  height: 68,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: isLadoum ? AppColors.goldGradient : null,
-                    color: !isLadoum ? breedColor.withValues(alpha: 0.2) : null,
+                    color: isLadoum
+                        ? AppColors.goldLight
+                        : AppColors.primaryContainer,
+                    border: Border.all(
+                      color: isLadoum
+                          ? AppColors.gold.withValues(alpha: 0.6)
+                          : AppColors.primary.withValues(alpha: 0.2),
+                      width: 2,
+                    ),
                   ),
-                  child: CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    child: CircleAvatar(
-                      radius: 28,
-                      backgroundColor: breedColor.withValues(alpha: 0.14),
+                  child: AnimalPhotoImage(
+                    photoUrl: animal.photoUrl,
+                    size: 64,
+                    fallback: Center(
                       child: Text(
                         animal.name.isNotEmpty
                             ? animal.name[0].toUpperCase()
                             : 'O',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: breedColor,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -320,169 +322,127 @@ class AnimalsListScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 14),
 
-                // Content
+                // 2. Nom en grand, boucle, puis poids
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Nom en grand
+                      Text(
+                        animal.name,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+
+                      // Boucle / Identifiant
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          const Icon(
+                            LucideIcons.tag,
+                            size: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 5),
                           Expanded(
                             child: Text(
-                              animal.name,
+                              tagLabel,
                               style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.3,
-                                color: AppColors.textPrimary,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
                               ),
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Poids mis en avant + Race & Enclos
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
+                              horizontal: 10,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.background,
+                              color: AppColors.primaryContainer,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.divider),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Icon(
-                                  LucideIcons.tag,
-                                  size: 12,
-                                  color: AppColors.textSecondary,
+                                  LucideIcons.scale,
+                                  size: 14,
+                                  color: AppColors.primary,
                                 ),
+                                const SizedBox(width: 5),
                                 Text(
-                                  animal.id,
+                                  weightLabel,
                                   style: const TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-
-                      // Breed & Sector
-                      Row(
-                        children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
+                              horizontal: 9,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: breedColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
+                              color: isLadoum
+                                  ? AppColors.goldLight
+                                  : AppColors.background,
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               breedName,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w800,
-                                color: breedColor,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              sectorName,
                               style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Metrics pills row
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          if (animal.currentWeightKg != null)
-                            _buildPillMetric(
-                              icon: LucideIcons.scale,
-                              label: '${animal.currentWeightKg} kg',
-                              color: AppColors.primary,
-                            ),
-                          _buildPillMetric(
-                            icon: LucideIcons.circle,
-                            iconSize: 7,
-                            label: Formatters.translateCondition(
-                              animal.bodyCondition,
-                            ),
-                            color: Formatters.getConditionColor(
-                              animal.bodyCondition,
+                          Text(
+                            sectorName,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
                             ),
                           ),
-                          if (animal.isFemale &&
-                              animal.reproductionStatus != 'not_pregnant')
-                            _buildPillMetric(
-                              icon: LucideIcons.heart,
-                              label: Formatters.translateReproStatus(
-                                animal.reproductionStatus,
-                              ),
-                              color: AppColors.goldDark,
-                            ),
                         ],
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 6),
                 const Icon(
                   LucideIcons.chevronRight,
-                  size: 14,
-                  color: AppColors.textMuted,
+                  size: 18,
+                  color: AppColors.textSecondary,
                 ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPillMetric({
-    required IconData icon,
-    required String label,
-    required Color color,
-    double iconSize = 13,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: iconSize, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
       ),
     );
   }

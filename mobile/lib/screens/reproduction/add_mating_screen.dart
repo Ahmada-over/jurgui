@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/error_retry_card.dart';
 import '../../providers/animals_provider.dart';
+import '../../providers/dashboard_provider.dart';
 import '../../providers/reproduction_provider.dart';
 
 class AddMatingScreen extends ConsumerStatefulWidget {
@@ -58,6 +60,7 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
       ref.invalidate(matingsProvider);
       ref.invalidate(pregnanciesProvider);
       ref.invalidate(animalsListProvider);
+      ref.invalidate(dashboardProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -132,7 +135,11 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
                       );
                     },
                     loading: () => const LinearProgressIndicator(),
-                    error: (e, _) => Text('Erreur: $e'),
+                    error: (e, _) => ErrorRetryCard(
+                      compact: true,
+                      message: 'Impossible de charger les brebis : $e',
+                      onRetry: () => ref.refresh(animalsListProvider),
+                    ),
                   ),
                   const SizedBox(height: 12),
 
@@ -165,7 +172,11 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
                       );
                     },
                     loading: () => const LinearProgressIndicator(),
-                    error: (e, _) => Text('Erreur: $e'),
+                    error: (e, _) => ErrorRetryCard(
+                      compact: true,
+                      message: 'Impossible de charger les béliers : $e',
+                      onRetry: () => ref.refresh(animalsListProvider),
+                    ),
                   ),
                 ],
               ),

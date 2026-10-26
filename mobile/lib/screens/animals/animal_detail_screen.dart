@@ -5,7 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/colors.dart';
 import '../../core/utils/formatters.dart';
-import '../../core/widgets/sheep_hoof_icon.dart';
+import '../../core/widgets/animal_photo_avatar.dart';
+import '../../core/widgets/error_retry_card.dart';
 import '../../models/animal.dart';
 import '../../providers/animals_provider.dart';
 
@@ -19,6 +20,15 @@ class AnimalDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
+  Animal? _optimisticAnimal;
+
+  void _applyOptimisticAnimal(Animal updated) {
+    if (mounted) {
+      setState(() => _optimisticAnimal = updated);
+    }
+    ref.read(animalsListProvider.notifier).upsertAnimal(updated);
+  }
+
   void _showAddWeightDialog(Animal animal) {
     final weightController = TextEditingController(
       text: animal.currentWeightKg != null
@@ -129,12 +139,44 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                 weightController.text.replaceAll(',', '.'),
               );
               if (w == null || w <= 0) return;
+              final notesText = notesController.text.trim();
               Navigator.pop(ctx);
-              await ref
-                  .read(animalActionsServiceProvider)
-                  .addWeight(animal.id, w, notesController.text.trim());
-              ref.invalidate(animalDetailProvider(animal.id));
-              ref.invalidate(animalsListProvider);
+
+              // Mise à jour instantanée (0ms) de l'interface
+              final optimisticRecord = WeightRecord(
+                id: DateTime.now().millisecondsSinceEpoch,
+                animalId: animal.id,
+                weightKg: w,
+                recordedAt: DateTime.now(),
+                notes: notesText.isEmpty ? null : notesText,
+              );
+              final optimistic = animal.copyWith(
+                currentWeightKg: w,
+                weightRecords: [...animal.weightRecords, optimisticRecord],
+              );
+              _applyOptimisticAnimal(optimistic);
+
+              try {
+                final savedRecord = await ref
+                    .read(animalActionsServiceProvider)
+                    .addWeight(animal.id, w, notesText);
+                final confirmed = animal.copyWith(
+                  currentWeightKg: w,
+                  weightRecords: [...animal.weightRecords, savedRecord],
+                );
+                _applyOptimisticAnimal(confirmed);
+                ref.invalidate(animalDetailProvider(animal.id));
+              } catch (e) {
+                _applyOptimisticAnimal(animal);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur : $e'),
+                      backgroundColor: AppColors.danger,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text(
               'Enregistrer la pesée',
@@ -201,7 +243,8 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
             children: [
               sectorsAsync.when(
                 data: (sectors) => DropdownButtonFormField<int>(
-                  value: selectedSectorId,
+                  initialValue: selectedSectorId,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'Enclos de destination',
                     prefixIcon: const Icon(LucideIcons.fence),
@@ -215,6 +258,8 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                       value: s.id,
                       child: Text(
                         '${s.name} (${s.currentOccupancy}/${s.estimatedCapacity})${isFull ? " [Plein]" : ""}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: s.id == animal.currentSectorId
                               ? FontWeight.bold
@@ -278,19 +323,57 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
               onPressed: selectedSectorId == null
                   ? null
                   : () async {
+                      final targetSectorId = selectedSectorId!;
+                      final reason = reasonController.text.trim().isEmpty
+                          ? 'Déplacement de routine'
+                          : reasonController.text.trim();
                       Navigator.pop(ctx);
-                      await ref
-                          .read(animalActionsServiceProvider)
-                          .moveAnimalSector(
-                            animal.id,
-                            selectedSectorId!,
-                            reasonController.text.trim().isEmpty
-                                ? 'Déplacement de routine'
-                                : reasonController.text.trim(),
+
+                      // Mise à jour instantanée (0ms) de l'interface
+                      final sectorsList = sectorsAsync.value;
+                      final targetSector = sectorsList
+                          ?.where((s) => s.id == targetSectorId)
+                          .firstOrNull;
+                      final optimisticMove = AnimalMovement(
+                        id: DateTime.now().millisecondsSinceEpoch,
+                        animalId: animal.id,
+                        fromSectorId: animal.currentSectorId,
+                        toSectorId: targetSectorId,
+                        movementDate: DateTime.now(),
+                        reason: reason,
+                      );
+                      final optimistic = animal.copyWith(
+                        currentSectorId: targetSectorId,
+                        currentSector: targetSector ?? animal.currentSector,
+                        movements: [optimisticMove, ...animal.movements],
+                      );
+                      _applyOptimisticAnimal(optimistic);
+
+                      try {
+                        final savedMove = await ref
+                            .read(animalActionsServiceProvider)
+                            .moveAnimalSector(
+                              animal.id,
+                              targetSectorId,
+                              reason,
+                            );
+                        final confirmed = optimistic.copyWith(
+                          movements: [savedMove, ...animal.movements],
+                        );
+                        _applyOptimisticAnimal(confirmed);
+                        ref.invalidate(animalDetailProvider(animal.id));
+                        ref.invalidate(sectorsProvider);
+                      } catch (e) {
+                        _applyOptimisticAnimal(animal);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erreur : $e'),
+                              backgroundColor: AppColors.danger,
+                            ),
                           );
-                      ref.invalidate(animalDetailProvider(animal.id));
-                      ref.invalidate(animalsListProvider);
-                      ref.invalidate(sectorsProvider);
+                        }
+                      }
                     },
               child: const Text(
                 'Confirmer le transfert',
@@ -303,120 +386,774 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final animalAsync = ref.watch(animalDetailProvider(widget.animalId));
+  String _formatIsoDate(DateTime d) {
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$m-$day';
+  }
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          widget.animalId,
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.5,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.refreshCw),
-            onPressed: () => ref.refresh(animalDetailProvider(widget.animalId)),
-          ),
-        ],
-      ),
-      body: animalAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primaryAccent),
-        ),
-        error: (err, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                LucideIcons.circleAlert,
-                size: 48,
-                color: AppColors.danger,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Erreur de chargement: $err',
-                style: const TextStyle(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () =>
-                    ref.refresh(animalDetailProvider(widget.animalId)),
-                child: const Text('Réessayer'),
-              ),
-            ],
-          ),
-        ),
-        data: (animal) {
-          final breedName = animal.breed?.name ?? 'Race inconnue';
-          final isLadoum =
-              breedName.toLowerCase().contains('ladoum') &&
-              !breedName.toLowerCase().contains('métis');
-          final breedColor = Formatters.getBreedColor(breedName);
+  void _showEditAnimalSheet(Animal animal) {
+    final nameController = TextEditingController(text: animal.name);
+    final tagController = TextEditingController(text: animal.physicalTag ?? '');
+    final priceController = TextEditingController(
+      text: animal.purchasePriceCfa != null
+          ? animal.purchasePriceCfa!.toStringAsFixed(0)
+          : '',
+    );
+    final fatherController = TextEditingController(text: animal.fatherId ?? '');
+    final motherController = TextEditingController(text: animal.motherId ?? '');
+    final notesController = TextEditingController(text: animal.notes ?? '');
 
-          return Stack(
-            children: [
-              ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
-                children: [
-                  // 1. HERO PRESTIGE HEADER
-                  _buildPrestigeHeroHeader(
-                    animal,
-                    breedName,
-                    isLadoum,
-                    breedColor,
+    int selectedBreedId = animal.breedId;
+    String selectedSex = animal.sex.toLowerCase();
+    String selectedOrigin = animal.origin;
+    String selectedCondition = animal.bodyCondition;
+    String selectedStatus = animal.status;
+    DateTime? selectedBirthDate = animal.birthDate;
+    String? currentPhotoUrl = animal.photoUrl;
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final breedsAsync = ref.watch(breedsProvider);
+
+          Future<void> pickBirthDate() async {
+            final now = DateTime.now();
+            final picked = await showDatePicker(
+              context: ctx,
+              initialDate: selectedBirthDate ?? now,
+              firstDate: DateTime(now.year - 15),
+              lastDate: now,
+              helpText: 'Date de naissance de l\'ovin',
+              cancelText: 'Annuler',
+              confirmText: 'Valider',
+            );
+            if (picked != null) {
+              setSheetState(() => selectedBirthDate = picked);
+            }
+          }
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 14,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  const SizedBox(height: 16),
-
-                  // 2. QUAD STAT TILES
-                  _buildQuickStatsGrid(animal),
-                  const SizedBox(height: 16),
-
-                  // 3. FL_CHART WEIGHT GROWTH TRAJECTORY
-                  _buildWeightGrowthChart(animal),
-                  const SizedBox(height: 16),
-
-                  // 4. PEDIGREE & LINEAGE CARD
-                  _buildPedigreeLineageCard(animal),
-                  const SizedBox(height: 16),
-
-                  // 5. CHARACTERISTICS & HEALTH CARD
-                  _buildCharacteristicsCard(animal),
-                  const SizedBox(height: 16),
-
-                  // 6. HISTORIQUE DES ENCLOS TIMELINE (MODULE A 3.5)
-                  _buildSectorMovementsTimeline(animal),
-                ],
-              ),
-
-              // FLOATING ACTIONS BAR AT BOTTOM
-              Positioned(
-                bottom: 16,
-                left: 16,
-                right: 16,
-                child: _buildBottomActionBar(animal),
-              ),
-            ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        LucideIcons.pencil,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Modifier la fiche de l\'ovin',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'ID: ${animal.id}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(LucideIcons.x, size: 20),
+                    ),
+                  ],
+                ),
+                const Divider(height: 20),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: GestureDetector(
+                            onTap: () async {
+                              final res = await showAnimalPhotoPickerSheet(
+                                ctx,
+                                hasCurrentPhoto:
+                                    currentPhotoUrl != null &&
+                                    currentPhotoUrl!.isNotEmpty,
+                              );
+                              if (res == null) return;
+                              if (res.removed) {
+                                setSheetState(() => currentPhotoUrl = null);
+                              } else if (res.dataUrl != null) {
+                                setSheetState(
+                                  () => currentPhotoUrl = res.dataUrl,
+                                );
+                              }
+                            },
+                            child: Column(
+                              children: [
+                                Stack(
+                                  children: [
+                                    Container(
+                                      width: 84,
+                                      height: 84,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: AppColors.primaryContainer,
+                                        border: Border.all(
+                                          color: AppColors.primary.withValues(
+                                            alpha: 0.25,
+                                          ),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: AnimalPhotoImage(
+                                        photoUrl: currentPhotoUrl,
+                                        size: 84,
+                                        fallback: const Center(
+                                          child: Icon(
+                                            LucideIcons.camera,
+                                            size: 28,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          LucideIcons.camera,
+                                          size: 13,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  currentPhotoUrl != null &&
+                                          currentPhotoUrl!.isNotEmpty
+                                      ? 'Changer ou supprimer la photo'
+                                      : 'Ajouter une photo de l\'ovin',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Nom de l\'animal *',
+                            prefixIcon: Icon(LucideIcons.badgeCheck),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: tagController,
+                          decoration: const InputDecoration(
+                            labelText: 'Numéro de boucle / tag physique',
+                            prefixIcon: Icon(LucideIcons.tag),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        breedsAsync.when(
+                          data: (breeds) => DropdownButtonFormField<int>(
+                            initialValue:
+                                breeds.any((b) => b.id == selectedBreedId)
+                                ? selectedBreedId
+                                : null,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Race ovine',
+                              prefixIcon: Icon(LucideIcons.folders),
+                            ),
+                            items: breeds
+                                .map(
+                                  (b) => DropdownMenuItem<int>(
+                                    value: b.id,
+                                    child: Text(
+                                      b.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setSheetState(() => selectedBreedId = val);
+                              }
+                            },
+                          ),
+                          loading: () => const LinearProgressIndicator(),
+                          error: (e, _) => Text('Erreur: $e'),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: selectedSex,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Sexe',
+                                  prefixIcon: Icon(
+                                    LucideIcons.venusAndMars,
+                                    size: 18,
+                                  ),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'female',
+                                    child: Text(
+                                      'Brebis',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'male',
+                                    child: Text(
+                                      'Bélier',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setSheetState(() => selectedSex = val);
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: selectedCondition,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'État corporel',
+                                  prefixIcon: Icon(
+                                    LucideIcons.heartPulse,
+                                    size: 18,
+                                  ),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'normal',
+                                    child: Text(
+                                      'Normal',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'thin',
+                                    child: Text(
+                                      'Maigre',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'fat',
+                                    child: Text(
+                                      'Gras',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setSheetState(
+                                      () => selectedCondition = val,
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        InkWell(
+                          onTap: pickBirthDate,
+                          borderRadius: BorderRadius.circular(12),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Date de naissance (optionnel)',
+                              prefixIcon: const Icon(LucideIcons.calendarDays),
+                              suffixIcon: selectedBirthDate != null
+                                  ? IconButton(
+                                      icon: const Icon(LucideIcons.x, size: 18),
+                                      tooltip: 'Effacer la date',
+                                      onPressed: () => setSheetState(
+                                        () => selectedBirthDate = null,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      LucideIcons.chevronDown,
+                                      size: 18,
+                                    ),
+                            ),
+                            child: Text(
+                              selectedBirthDate != null
+                                  ? Formatters.formatDate(selectedBirthDate)
+                                  : 'Non renseignée (cliquer pour choisir)',
+                              style: TextStyle(
+                                color: selectedBirthDate != null
+                                    ? AppColors.textPrimary
+                                    : AppColors.textMuted,
+                                fontWeight: selectedBirthDate != null
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: selectedOrigin,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Origine',
+                                  prefixIcon: Icon(
+                                    LucideIcons.compass,
+                                    size: 18,
+                                  ),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'birth',
+                                    child: Text(
+                                      'Né à la ferme',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'purchase',
+                                    child: Text(
+                                      'Achat extérieur',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setSheetState(() => selectedOrigin = val);
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: selectedStatus,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Statut',
+                                  prefixIcon: Icon(
+                                    LucideIcons.activity,
+                                    size: 18,
+                                  ),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'active',
+                                    child: Text(
+                                      'Actif',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'sold',
+                                    child: Text(
+                                      'Vendu',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'deceased',
+                                    child: Text(
+                                      'Décédé',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'transferred',
+                                    child: Text(
+                                      'Transféré',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setSheetState(() => selectedStatus = val);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: priceController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Prix d\'acquisition (FCFA)',
+                            suffixText: 'FCFA',
+                            prefixIcon: Icon(LucideIcons.banknote),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: fatherController,
+                                decoration: const InputDecoration(
+                                  labelText: 'ID Père (Bélier)',
+                                  prefixIcon: Icon(LucideIcons.mars),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: motherController,
+                                decoration: const InputDecoration(
+                                  labelText: 'ID Mère (Brebis)',
+                                  prefixIcon: Icon(LucideIcons.venus),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: notesController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Notes de suivi',
+                            prefixIcon: Icon(LucideIcons.filePenLine),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  if (nameController.text.trim().isEmpty) {
+                                    return;
+                                  }
+                                  setSheetState(() => isSaving = true);
+                                  try {
+                                    final payload = <String, dynamic>{
+                                      'name': nameController.text.trim(),
+                                      'physical_tag':
+                                          tagController.text.trim().isEmpty
+                                          ? null
+                                          : tagController.text.trim(),
+                                      'photo_url': currentPhotoUrl,
+                                      'breed_id': selectedBreedId,
+                                      'sex': selectedSex,
+                                      'birth_date': selectedBirthDate != null
+                                          ? _formatIsoDate(selectedBirthDate!)
+                                          : null,
+                                      'origin': selectedOrigin,
+                                      'body_condition': selectedCondition,
+                                      'status': selectedStatus,
+                                      'purchase_price_cfa': double.tryParse(
+                                        priceController.text.replaceAll(
+                                          ',',
+                                          '.',
+                                        ),
+                                      ),
+                                      'father_id':
+                                          fatherController.text.trim().isEmpty
+                                          ? null
+                                          : fatherController.text.trim(),
+                                      'mother_id':
+                                          motherController.text.trim().isEmpty
+                                          ? null
+                                          : motherController.text.trim(),
+                                      'notes':
+                                          notesController.text.trim().isEmpty
+                                          ? null
+                                          : notesController.text.trim(),
+                                    };
+                                    final updated = await ref
+                                        .read(animalActionsServiceProvider)
+                                        .updateAnimal(animal.id, payload);
+                                    final merged = updated.copyWith(
+                                      weightRecords: animal.weightRecords,
+                                      movements: animal.movements,
+                                    );
+                                    _applyOptimisticAnimal(merged);
+                                    ref.invalidate(
+                                      animalDetailProvider(animal.id),
+                                    );
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Fiche ovin mise à jour avec succès',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    setSheetState(() => isSaving = false);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Erreur : $e'),
+                                          backgroundColor: AppColors.danger,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                          icon: isSaving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(LucideIcons.check, size: 18),
+                          label: const Text(
+                            'Enregistrer les modifications',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
     );
   }
 
-  // --- HERO HEADER ---
-  Widget _buildPrestigeHeroHeader(
+  @override
+  Widget build(BuildContext context) {
+    final animalAsync = ref.watch(animalDetailProvider(widget.animalId));
+    final activeAnimal = _optimisticAnimal ?? animalAsync.value;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
+        title: Text(
+          widget.animalId,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+          ),
+        ),
+        actions: [
+          if (activeAnimal != null)
+            IconButton(
+              icon: const Icon(LucideIcons.pencil, color: Colors.white),
+              tooltip: 'Modifier la fiche',
+              onPressed: () => _showEditAnimalSheet(activeAnimal),
+            ),
+          IconButton(
+            icon: const Icon(LucideIcons.refreshCw, color: Colors.white),
+            onPressed: () {
+              setState(() => _optimisticAnimal = null);
+              ref.invalidate(animalDetailProvider(widget.animalId));
+            },
+          ),
+        ],
+      ),
+      body: animalAsync.when(
+        loading: () => _optimisticAnimal != null
+            ? _buildDetailBody(_optimisticAnimal!)
+            : const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.primaryAccent,
+                ),
+              ),
+        error: (err, _) => _optimisticAnimal != null
+            ? _buildDetailBody(_optimisticAnimal!)
+            : ErrorRetryCard(
+                message: 'Impossible de charger la fiche : $err',
+                onRetry: () =>
+                    ref.refresh(animalDetailProvider(widget.animalId)),
+              ),
+        data: (fetchedAnimal) {
+          final animal = _optimisticAnimal ?? fetchedAnimal;
+          return _buildDetailBody(animal);
+        },
+      ),
+    );
+  }
+
+  Widget _buildDetailBody(Animal animal) {
+    final breedName = animal.breed?.name ?? 'Race inconnue';
+    final isLadoum =
+        breedName.toLowerCase().contains('ladoum') &&
+        !breedName.toLowerCase().contains('métis');
+
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+          children: [
+            // 1. CARTE D'IDENTITÉ DE L'OVIN : Photo -> Nom en grand -> Boucle -> Poids
+            _buildIdentityHeroCard(
+              animal,
+              breedName,
+              isLadoum,
+            ),
+            const SizedBox(height: 22),
+
+            // 2. SECTION EN DESSOUS : Courbe, Généalogie, Caractéristiques, Historique d'enclos
+            const Padding(
+              padding: EdgeInsets.only(left: 4, bottom: 10),
+              child: Text(
+                'Suivi & Historique',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+
+            // Courbe de croissance
+            _buildWeightGrowthChart(animal),
+            const SizedBox(height: 16),
+
+            // Généalogie
+            _buildPedigreeLineageCard(animal),
+            const SizedBox(height: 16),
+
+            // Caractéristiques & Santé
+            _buildCharacteristicsCard(animal),
+            const SizedBox(height: 16),
+
+            // Historique des enclos
+            _buildSectorMovementsTimeline(animal),
+          ],
+        ),
+
+        // FLOATING ACTIONS BAR AT BOTTOM
+        Positioned(
+          bottom: 16,
+          left: 16,
+          right: 16,
+          child: _buildBottomActionBar(animal),
+        ),
+      ],
+    );
+  }
+
+  // --- CARTE D'IDENTITÉ : Photo, Nom en grand, Boucle, puis Poids ---
+  Widget _buildIdentityHeroCard(
     Animal animal,
     String breedName,
     bool isLadoum,
-    Color breedColor,
   ) {
+    final weightValue = animal.currentWeightKg != null
+        ? '${animal.currentWeightKg!.toStringAsFixed(1)} kg'
+        : 'Non pesé';
+    final sectorValue = animal.currentSector?.name ?? 'Non assigné';
+    final ageValue = animal.birthDate != null
+        ? '${DateTime.now().difference(animal.birthDate!).inDays ~/ 30} mois'
+        : (animal.estimatedAgeMonths != null
+              ? '${animal.estimatedAgeMonths} mois'
+              : 'Non précisé');
+    final tagText =
+        animal.physicalTag != null && animal.physicalTag!.isNotEmpty
+            ? 'Boucle : ${animal.physicalTag} • ID : ${animal.id}'
+            : 'Boucle / ID : ${animal.id}';
+
     return Container(
       decoration: BoxDecoration(
         gradient: AppColors.heroGradient,
@@ -425,109 +1162,135 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Avatar with Prestige Border
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: isLadoum ? AppColors.goldGradient : null,
-                  color: isLadoum ? null : AppColors.primaryAccent,
-                  boxShadow: isLadoum ? AppColors.glowGold : null,
-                ),
-                padding: const EdgeInsets.all(3),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFF092920),
-                  ),
-                  child: Center(
-                    child: Text(
-                      animal.name.isNotEmpty
-                          ? animal.name.characters.first.toUpperCase()
-                          : 'O',
-                      style: TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w900,
-                        color: isLadoum ? AppColors.gold : Colors.white,
+              // 1. Photo de l'ovin (grande et reconnaissable)
+              GestureDetector(
+                onTap: () async {
+                  final res = await showAnimalPhotoPickerSheet(
+                    context,
+                    hasCurrentPhoto:
+                        animal.photoUrl != null && animal.photoUrl!.isNotEmpty,
+                  );
+                  if (res == null) return;
+                  final newPhoto = res.removed ? null : res.dataUrl;
+                  final optimistic = animal.copyWith(
+                    photoUrl: newPhoto,
+                    clearPhotoUrl: res.removed,
+                  );
+                  _applyOptimisticAnimal(optimistic);
+                  try {
+                    final updated = await ref
+                        .read(animalActionsServiceProvider)
+                        .updateAnimal(animal.id, {'photo_url': newPhoto});
+                    _applyOptimisticAnimal(
+                      updated.copyWith(
+                        weightRecords: animal.weightRecords,
+                        movements: animal.movements,
+                      ),
+                    );
+                    ref.invalidate(animalDetailProvider(animal.id));
+                  } catch (e) {
+                    _applyOptimisticAnimal(animal);
+                  }
+                },
+                child: Stack(
+                  children: [
+                    Container(
+                      width: 84,
+                      height: 84,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isLadoum
+                            ? AppColors.goldLight
+                            : Colors.white.withValues(alpha: 0.2),
+                      ),
+                      padding: const EdgeInsets.all(3),
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF092920),
+                        ),
+                        child: AnimalPhotoImage(
+                          photoUrl: animal.photoUrl,
+                          size: 78,
+                          fallback: Center(
+                            child: Text(
+                              animal.name.isNotEmpty
+                                  ? animal.name.characters.first.toUpperCase()
+                                  : 'O',
+                              style: const TextStyle(
+                                fontSize: 34,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          LucideIcons.camera,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 16),
-              // Animal info & tags
+
+              // 2. Nom en grand, puis Boucle
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (isLadoum)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: AppColors.goldGradient,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          '✦ ÉLITE LADOUM DAKAR',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF382305),
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ),
                     Text(
                       animal.name,
                       style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
                         color: Colors.white,
-                        letterSpacing: -0.3,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'ID: ${animal.id}${animal.physicalTag != null ? " • Boucle: ${animal.physicalTag}" : ""}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white.withValues(alpha: 0.75),
+                      tagText,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
+                      spacing: 8,
+                      runSpacing: 6,
                       children: [
-                        _buildGlassChip(
+                        _buildIdentityTag(
                           label: breedName,
-                          customIcon: SheepHoofIcon(
-                            size: 12,
-                            color: isLadoum
-                                ? AppColors.gold
-                                : AppColors.primaryAccent,
-                          ),
-                          color: isLadoum
-                              ? AppColors.gold
-                              : AppColors.primaryAccent,
+                          isChampagne: isLadoum,
                         ),
-                        _buildGlassChip(
+                        _buildIdentityTag(
                           label: animal.isFemale ? 'Brebis' : 'Bélier',
-                          icon: animal.isFemale
-                              ? LucideIcons.venus
-                              : LucideIcons.mars,
-                          color: animal.isFemale
-                              ? const Color(0xFFF472B6)
-                              : const Color(0xFF60A5FA),
+                          isChampagne: false,
                         ),
                       ],
                     ),
@@ -536,35 +1299,53 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
+          const SizedBox(height: 18),
 
-  Widget _buildGlassChip({
-    required String label,
-    IconData? icon,
-    Widget? customIcon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          customIcon ?? Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: color,
+          // 3. Poids mis en avant (suivi de l'enclos et de l'âge)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildIdentityMetric(
+                    label: 'Poids actuel',
+                    value: weightValue,
+                    highlight: true,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 32,
+                  color: AppColors.divider,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: _buildIdentityMetric(
+                      label: 'Enclos',
+                      value: sectorValue,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 32,
+                  color: AppColors.divider,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: _buildIdentityMetric(
+                      label: 'Âge',
+                      value: ageValue,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -572,138 +1353,59 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
     );
   }
 
-  // --- QUAD STAT TILES ---
-  Widget _buildQuickStatsGrid(Animal animal) {
-    // Calculate weight delta if multiple weights
-    String? weightTrend;
-    if (animal.weightRecords.length >= 2) {
-      final sorted = [...animal.weightRecords]
-        ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
-      final delta = sorted.last.weightKg - sorted[sorted.length - 2].weightKg;
-      final sign = delta >= 0 ? '+' : '';
-      weightTrend = '$sign${delta.toStringAsFixed(1)} kg';
-    }
+  Widget _buildIdentityTag({
+    required String label,
+    required bool isChampagne,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isChampagne
+            ? AppColors.goldLight
+            : Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: isChampagne ? AppColors.textPrimary : Colors.white,
+        ),
+      ),
+    );
+  }
 
-    final ageString = animal.birthDate != null
-        ? '${DateTime.now().difference(animal.birthDate!).inDays ~/ 30} mois'
-        : (animal.estimatedAgeMonths != null
-              ? '${animal.estimatedAgeMonths} mois (est.)'
-              : 'Non précisé');
-
-    return Row(
+  Widget _buildIdentityMetric({
+    required String label,
+    required String value,
+    bool highlight = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _buildMetricTile(
-            title: 'Poids Actuel',
-            value: animal.currentWeightKg != null
-                ? '${animal.currentWeightKg!.toStringAsFixed(1)} kg'
-                : 'Non pesé',
-            subtitle:
-                weightTrend ??
-                (animal.weightRecords.isNotEmpty
-                    ? 'Dernier relevé'
-                    : 'Aucun relevé'),
-            icon: LucideIcons.scale,
-            iconColor: AppColors.primaryAccent,
-            trendColor: weightTrend != null && weightTrend.startsWith('+')
-                ? AppColors.success
-                : AppColors.textSecondary,
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildMetricTile(
-            title: 'Enclos',
-            value: animal.currentSector?.name ?? 'Non assigné',
-            subtitle: animal.currentSector != null
-                ? '${animal.currentSector!.currentOccupancy}/${animal.currentSector!.estimatedCapacity} ovins'
-                : 'Secteur libre',
-            icon: LucideIcons.doorOpen,
-            iconColor: const Color(0xFF38BDF8),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: highlight ? 17 : 15,
+            fontWeight: FontWeight.w700,
+            color: highlight ? AppColors.primary : AppColors.textPrimary,
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildMetricTile(
-            title: 'Âge',
-            value: ageString,
-            subtitle: animal.isFemale
-                ? Formatters.translateReproStatus(animal.reproductionStatus)
-                : 'Reproducteur',
-            icon: LucideIcons.calendarDays,
-            iconColor: AppColors.gold,
-          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
-    );
-  }
-
-  Widget _buildMetricTile({
-    required String title,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color iconColor,
-    Color? trendColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: AppColors.softShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 14, color: iconColor),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textPrimary,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: trendColor ?? AppColors.textMuted,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
     );
   }
 
@@ -744,7 +1446,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                     'Courbe de Croissance',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                     ),
                   ),
@@ -756,10 +1458,10 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
-                    vertical: 5,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.08),
+                    color: AppColors.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Row(
@@ -772,9 +1474,9 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                       ),
                       SizedBox(width: 4),
                       Text(
-                        '+ Pesée',
+                        'Nouvelle pesée',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primary,
                         ),
@@ -797,10 +1499,10 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(
+                  const Icon(
                     LucideIcons.scale,
                     size: 36,
-                    color: AppColors.textMuted.withValues(alpha: 0.6),
+                    color: AppColors.textSecondary,
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -820,13 +1522,13 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                       ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 8,
+                        vertical: 10,
                       ),
                     ),
                     icon: const Icon(LucideIcons.plus, size: 16),
                     label: const Text(
                       'Enregistrer la première pesée',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 13),
                     ),
                     onPressed: () => _showAddWeightDialog(animal),
                   ),
@@ -866,7 +1568,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                     drawVerticalLine: false,
                     horizontalInterval: 10,
                     getDrawingHorizontalLine: (value) => FlLine(
-                      color: AppColors.divider.withValues(alpha: 0.6),
+                      color: AppColors.divider,
                       strokeWidth: 1,
                       dashArray: [4, 4],
                     ),
@@ -875,13 +1577,13 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 38,
+                        reservedSize: 42,
                         getTitlesWidget: (val, meta) => Text(
                           '${val.toInt()}k',
                           style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.textMuted,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -889,7 +1591,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 24,
+                        reservedSize: 28,
                         interval: (records.length > 4
                             ? (records.length / 3).floorToDouble()
                             : 1),
@@ -900,9 +1602,9 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                             return Text(
                               '${d.day}/${d.month}',
                               style: const TextStyle(
-                                fontSize: 10,
-                                color: AppColors.textMuted,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
                               ),
                             );
                           }
@@ -942,7 +1644,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                       ],
                       isCurved: true,
                       curveSmoothness: 0.35,
-                      color: AppColors.primaryLight,
+                      color: AppColors.primary,
                       barWidth: 3.5,
                       isStrokeCapRound: true,
                       dotData: FlDotData(
@@ -950,7 +1652,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                         getDotPainter: (spot, percent, barData, index) =>
                             FlDotCirclePainter(
                               radius: 4.5,
-                              color: AppColors.primaryAccent,
+                              color: AppColors.primary,
                               strokeWidth: 2,
                               strokeColor: Colors.white,
                             ),
@@ -961,8 +1663,8 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            AppColors.primaryAccent.withValues(alpha: 0.28),
-                            AppColors.primaryAccent.withValues(alpha: 0.0),
+                            AppColors.primary.withValues(alpha: 0.2),
+                            AppColors.primary.withValues(alpha: 0.0),
                           ],
                         ),
                       ),
@@ -996,16 +1698,18 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
           Text(
             title,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: isHighlighted ? AppColors.primary : AppColors.textMuted,
+              color: isHighlighted
+                  ? AppColors.primary
+                  : AppColors.textSecondary,
             ),
           ),
           Text(
             value,
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
               color: isHighlighted ? AppColors.primary : AppColors.textPrimary,
             ),
           ),
@@ -1036,16 +1740,16 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                 ),
                 child: const Icon(
                   LucideIcons.network,
-                  color: AppColors.goldDark,
+                  color: AppColors.primary,
                   size: 18,
                 ),
               ),
               const SizedBox(width: 10),
               const Text(
-                'Généalogie & Ascendance (Pedigree)',
+                'Généalogie & Ascendance',
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
               ),
@@ -1061,7 +1765,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                   role: 'Père (Bélier)',
                   parentId: animal.fatherId,
                   icon: LucideIcons.mars,
-                  color: const Color(0xFF3B82F6),
+                  color: const Color(0xFF1D4ED8),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1071,7 +1775,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                   role: 'Mère (Brebis)',
                   parentId: animal.motherId,
                   icon: LucideIcons.venus,
-                  color: const Color(0xFFEC4899),
+                  color: const Color(0xFFBE185D),
                 ),
               ),
             ],
@@ -1095,9 +1799,9 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.05),
+          color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1106,12 +1810,15 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
               children: [
                 Icon(icon, size: 16, color: color),
                 const SizedBox(width: 6),
-                Text(
-                  role,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                Expanded(
+                  child: Text(
+                    role,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -1120,19 +1827,21 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
             Text(
               hasParent ? parentId : 'Non répertorié',
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: hasParent ? AppColors.textPrimary : AppColors.textMuted,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: hasParent
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
               ),
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
             Text(
-              hasParent ? 'Consulter la fiche ➔' : 'Origine externe',
+              hasParent ? 'Voir la fiche' : 'Origine externe',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: hasParent ? color : AppColors.textMuted,
+                color: hasParent ? color : AppColors.textSecondary,
               ),
             ),
           ],
@@ -1168,20 +1877,62 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'Caractéristiques & État Sanitaire',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+              const Expanded(
+                child: Text(
+                  'Caractéristiques',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => _showEditAnimalSheet(animal),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        LucideIcons.pencil,
+                        size: 13,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Modifier',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
 
+          if (animal.birthDate != null)
+            _buildDetailRow(
+              label: 'Date de naissance',
+              value: Formatters.formatDate(animal.birthDate),
+            ),
           _buildDetailRow(
-            label: 'État corporel (BCS)',
+            label: 'État corporel',
             value: Formatters.translateCondition(animal.bodyCondition),
             badgeColor: Formatters.getConditionColor(animal.bodyCondition),
           ),
@@ -1239,8 +1990,8 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
               child: Text(
                 value,
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                   color: badgeColor,
                 ),
               ),
@@ -1287,25 +2038,13 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
               ),
               const SizedBox(width: 10),
               const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Historique des Mouvements d\'Enclos',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      'Registre inaltérable (Conformité Module A)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Historique d\'Enclos',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -1313,12 +2052,12 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
           const SizedBox(height: 14),
 
           if (animal.movements.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 'Aucun déplacement historisé pour cet animal.',
                 style: TextStyle(
-                  color: AppColors.textMuted.withValues(alpha: 0.8),
+                  color: AppColors.textSecondary,
                   fontSize: 13,
                 ),
               ),
@@ -1337,15 +2076,15 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                     color: AppColors.background,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: AppColors.divider.withValues(alpha: 0.5),
+                      color: AppColors.divider,
                     ),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primaryContainer,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -1362,8 +2101,8 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                             Text(
                               'Vers Enclos #${m.toSectorId}',
                               style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary,
                               ),
                             ),
@@ -1371,7 +2110,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                             Text(
                               '${Formatters.formatDateTime(m.movementDate)}${m.reason != null ? " • ${m.reason}" : ""}',
                               style: const TextStyle(
-                                fontSize: 11,
+                                fontSize: 13,
                                 color: AppColors.textSecondary,
                               ),
                             ),
@@ -1388,13 +2127,14 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
     );
   }
 
-  // --- FLOATING ACTION BAR ---
+  // --- FLOATING ACTION BAR (OPAQUE) ---
   Widget _buildBottomActionBar(Animal animal) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D3B2E).withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(28),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider),
         boxShadow: AppColors.floatingShadow,
       ),
       child: Row(
@@ -1402,10 +2142,10 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
           Expanded(
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryAccent,
-                foregroundColor: const Color(0xFF092920),
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 elevation: 0,
@@ -1413,29 +2153,47 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
               icon: const Icon(LucideIcons.scale, size: 18),
               label: const Text(
                 'Peser',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
               ),
               onPressed: () => _showAddWeightDialog(animal),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: 0.15),
-                foregroundColor: Colors.white,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.divider),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                elevation: 0,
               ),
-              icon: const Icon(LucideIcons.arrowLeftRight, size: 18),
+              icon: const Icon(LucideIcons.arrowLeftRight, size: 17),
               label: const Text(
                 'Déplacer',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               onPressed: () => _showMoveSectorDialog(animal),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.divider),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              icon: const Icon(LucideIcons.pencil, size: 17),
+              label: const Text(
+                'Modifier',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+              onPressed: () => _showEditAnimalSheet(animal),
             ),
           ),
         ],

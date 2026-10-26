@@ -1,10 +1,10 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/colors.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/error_retry_card.dart';
 import '../../models/reproduction.dart';
 import '../../providers/reproduction_provider.dart';
 
@@ -55,10 +55,9 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
               title: const Text(
                 'Reproduction & Gestation',
                 style: TextStyle(
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   fontSize: 18,
                   color: Colors.white,
-                  letterSpacing: -0.3,
                 ),
               ),
               background: Container(
@@ -68,7 +67,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
               ),
             ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(42),
+              preferredSize: const Size.fromHeight(44),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: _buildIslandTabBar(),
@@ -81,15 +80,18 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
           children: [
             // Tab 1: Gestations
             RefreshIndicator(
-              color: AppColors.primaryAccent,
+              color: AppColors.primary,
               onRefresh: () async => ref.refresh(pregnanciesProvider),
               child: pregnanciesAsync.when(
                 loading: () => const Center(
                   child: CircularProgressIndicator(
-                    color: AppColors.primaryAccent,
+                    color: AppColors.primary,
                   ),
                 ),
-                error: (err, _) => Center(child: Text('Erreur: $err')),
+                error: (err, _) => ErrorRetryCard(
+                  message: 'Impossible de charger les gestations : $err',
+                  onRetry: () => ref.refresh(pregnanciesProvider),
+                ),
                 data: (pregnancies) {
                   if (pregnancies.isEmpty) {
                     return _buildEmptyState(
@@ -111,15 +113,18 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
 
             // Tab 2: Saillies
             RefreshIndicator(
-              color: AppColors.primaryAccent,
+              color: AppColors.primary,
               onRefresh: () async => ref.refresh(matingsProvider),
               child: matingsAsync.when(
                 loading: () => const Center(
                   child: CircularProgressIndicator(
-                    color: AppColors.primaryAccent,
+                    color: AppColors.primary,
                   ),
                 ),
-                error: (err, _) => Center(child: Text('Erreur: $err')),
+                error: (err, _) => ErrorRetryCard(
+                  message: 'Impossible de charger les saillies : $err',
+                  onRetry: () => ref.refresh(matingsProvider),
+                ),
                 data: (matings) {
                   if (matings.isEmpty) {
                     return _buildEmptyState(
@@ -148,12 +153,12 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
   // --- ISLAND TAB BAR ---
   Widget _buildIslandTabBar() {
     return Container(
-      height: 38,
+      height: 40,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        color: Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -182,20 +187,16 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
             children: [
               Icon(
                 icon,
-                size: 14,
-                color: isActive
-                    ? AppColors.primary
-                    : Colors.white.withValues(alpha: 0.8),
+                size: 15,
+                color: isActive ? AppColors.primary : Colors.white,
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: isActive
-                      ? AppColors.primary
-                      : Colors.white.withValues(alpha: 0.8),
+                  color: isActive ? AppColors.primary : Colors.white,
                 ),
               ),
             ],
@@ -218,7 +219,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
         children: [
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.primaryContainer,
               shape: BoxShape.circle,
             ),
@@ -266,7 +267,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
       ),
       child: Column(
         children: [
-          // Header with Gradient
+          // Header with Gradient (solid white text)
           Container(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
             decoration: BoxDecoration(
@@ -287,13 +288,13 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: Colors.white.withValues(alpha: 0.18),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     LucideIcons.baby,
-                    size: 28,
-                    color: Colors.white.withValues(alpha: 0.9),
+                    size: 26,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -304,16 +305,18 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                       Text(
                         'Brebis : ${preg.femaleId}',
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         'Bélier : ${preg.ramId ?? "Non précisé"}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withValues(alpha: 0.8),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
                     ],
@@ -326,17 +329,17 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: isUrgent
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    daysLeft > 0 ? 'J-$daysLeft' : '⚡ IMMINENT',
+                    daysLeft > 0 ? 'J-$daysLeft' : 'IMMINENT',
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: isUrgent ? const Color(0xFFB91C1C) : Colors.white,
+                      fontWeight: FontWeight.w700,
+                      color: isUrgent
+                          ? const Color(0xFFB91C1C)
+                          : AppColors.primary,
                     ),
                   ),
                 ),
@@ -358,14 +361,15 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                       'J+${preg.currentDay} / ${preg.gestationDurationDays} jours',
                       style: const TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
                       'Prévue le ${Formatters.formatDate(preg.expectedBirthDate)}',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -373,7 +377,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                 ),
                 const SizedBox(height: 8),
 
-                // Sleek progress bar
+                // Progress bar
                 Stack(
                   children: [
                     Container(
@@ -388,29 +392,10 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                       child: Container(
                         height: 10,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: isUrgent
-                                ? [
-                                    const Color(0xFFEF4444),
-                                    const Color(0xFFF97316),
-                                  ]
-                                : [
-                                    AppColors.primaryAccent,
-                                    AppColors.primaryLight,
-                                  ],
-                          ),
+                          color: isUrgent
+                              ? AppColors.danger
+                              : AppColors.primary,
                           borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                              color:
-                                  (isUrgent
-                                          ? AppColors.danger
-                                          : AppColors.primaryAccent)
-                                      .withValues(alpha: 0.4),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
                         ),
                       ),
                     ),
@@ -418,13 +403,13 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                 ),
                 const SizedBox(height: 18),
 
-                // Milestones with glowing nodes
+                // Milestones
                 const Text(
                   'Jalons du suivi de gestation',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -449,10 +434,10 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
 
   Widget _buildMilestoneRow(GestationTimelineItem item, {bool isLast = false}) {
     final nodeColor = item.isPassed
-        ? AppColors.success
+        ? AppColors.primary
         : item.dayOffset <= 10
         ? AppColors.danger
-        : AppColors.textMuted;
+        : AppColors.textSecondary;
 
     return IntrinsicHeight(
       child: Row(
@@ -469,21 +454,13 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                   height: 20,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: item.isPassed ? AppColors.success : Colors.white,
+                    color: item.isPassed ? AppColors.primary : Colors.white,
                     border: Border.all(color: nodeColor, width: 2.5),
-                    boxShadow: item.isPassed
-                        ? [
-                            BoxShadow(
-                              color: AppColors.success.withValues(alpha: 0.35),
-                              blurRadius: 8,
-                            ),
-                          ]
-                        : null,
                   ),
                   child: item.isPassed
                       ? const Icon(
                           LucideIcons.check,
-                          size: 11,
+                          size: 12,
                           color: Colors.white,
                         )
                       : null,
@@ -494,7 +471,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                       width: 2,
                       margin: const EdgeInsets.symmetric(vertical: 2),
                       color: item.isPassed
-                          ? AppColors.success.withValues(alpha: 0.3)
+                          ? AppColors.primary.withValues(alpha: 0.3)
                           : AppColors.divider,
                     ),
                   ),
@@ -509,17 +486,17 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
-                  vertical: 8,
+                  vertical: 9,
                 ),
                 decoration: BoxDecoration(
                   color: item.isPassed
-                      ? AppColors.success.withValues(alpha: 0.06)
+                      ? AppColors.primaryContainer
                       : AppColors.background,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: item.isPassed
-                        ? AppColors.success.withValues(alpha: 0.25)
-                        : AppColors.divider.withValues(alpha: 0.5),
+                        ? AppColors.primary.withValues(alpha: 0.25)
+                        : AppColors.divider,
                   ),
                 ),
                 child: Row(
@@ -532,26 +509,20 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                           Text(
                             'J+${item.dayOffset} — ${Formatters.formatDate(item.targetDate)}',
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                               color: item.isPassed
-                                  ? AppColors.success
+                                  ? AppColors.primary
                                   : AppColors.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             item.title,
-                            style: TextStyle(
-                              fontSize: 12,
+                            style: const TextStyle(
+                              fontSize: 13.5,
                               fontWeight: FontWeight.w700,
-                              color: item.isPassed
-                                  ? AppColors.textMuted
-                                  : AppColors.textPrimary,
-                              decoration: item.isPassed
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              decorationColor: AppColors.textMuted,
+                              color: AppColors.textPrimary,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -562,18 +533,18 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
-                          vertical: 3,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.15),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Text(
-                          '✓ Fait',
+                          'Fait',
                           style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.success,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
@@ -595,6 +566,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.divider),
         boxShadow: AppColors.softShadow,
       ),
       child: Row(
@@ -602,12 +574,15 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
-              gradient: AppColors.goldGradient,
+            decoration: const BoxDecoration(
+              color: AppColors.goldLight,
               shape: BoxShape.circle,
-              boxShadow: AppColors.glowGold,
             ),
-            child: const Icon(LucideIcons.heart, color: Colors.white, size: 22),
+            child: const Icon(
+              LucideIcons.heart,
+              color: AppColors.primary,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -618,7 +593,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                   '${m.femaleId} × ${m.ramId ?? "Bélier inconnu"}',
                   style: const TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
@@ -626,7 +601,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                 Text(
                   '${Formatters.formatDate(m.matingDate)} • ${m.matingType}',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -642,8 +617,8 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
             child: Text(
               m.status,
               style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
                 color: AppColors.primary,
               ),
             ),
@@ -653,46 +628,35 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
     );
   }
 
-  // --- FLOATING ACTION BAR ---
+  // --- FLOATING ACTION BAR (FOND BLANC OPAQUE SANS FLOU) ---
   Widget _buildFloatingActionBar() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0D3B2E).withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: AppColors.floatingShadow,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildFabButton(
+            icon: LucideIcons.baby,
+            label: 'Mise bas',
+            backgroundColor: AppColors.goldLight,
+            textColor: AppColors.textPrimary,
+            onTap: () => context.push('/reproduction/birth'),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildFabButton(
-                icon: LucideIcons.baby,
-                label: 'Mise bas',
-                color: AppColors.gold,
-                textColor: const Color(0xFF382305),
-                onTap: () => context.push('/reproduction/birth'),
-              ),
-              const SizedBox(width: 10),
-              _buildFabButton(
-                icon: LucideIcons.plus,
-                label: 'Saillie',
-                color: AppColors.primaryAccent,
-                textColor: const Color(0xFF092920),
-                onTap: () => context.push('/reproduction/mating'),
-              ),
-            ],
+          const SizedBox(width: 10),
+          _buildFabButton(
+            icon: LucideIcons.plus,
+            label: 'Saillie',
+            backgroundColor: AppColors.primary,
+            textColor: Colors.white,
+            onTap: () => context.push('/reproduction/mating'),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -700,7 +664,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
   Widget _buildFabButton({
     required IconData icon,
     required String label,
-    required Color color,
+    required Color backgroundColor,
     required Color textColor,
     required VoidCallback onTap,
   }) {
@@ -709,8 +673,8 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20),
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Row(
           children: [
@@ -720,7 +684,7 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
               label,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: textColor,
               ),
             ),

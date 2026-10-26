@@ -3,8 +3,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/colors.dart';
+import '../../core/widgets/error_retry_card.dart';
 import '../../models/reproduction.dart';
 import '../../providers/animals_provider.dart';
+import '../../providers/dashboard_provider.dart';
 import '../../providers/reproduction_provider.dart';
 
 class RecordBirthScreen extends ConsumerStatefulWidget {
@@ -82,6 +84,8 @@ class _RecordBirthScreenState extends ConsumerState<RecordBirthScreen> {
 
       ref.invalidate(pregnanciesProvider);
       ref.invalidate(animalsListProvider);
+      ref.invalidate(dashboardProvider);
+      ref.invalidate(sectorsProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -130,6 +134,7 @@ class _RecordBirthScreenState extends ConsumerState<RecordBirthScreen> {
                     data: (pregs) {
                       return DropdownButtonFormField<Pregnancy>(
                         initialValue: _selectedPregnancy,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Sélectionner la gestation *',
                           prefixIcon: Icon(LucideIcons.baby),
@@ -139,6 +144,8 @@ class _RecordBirthScreenState extends ConsumerState<RecordBirthScreen> {
                             value: p,
                             child: Text(
                               'Brebis ${p.femaleId} (Bélier : ${p.ramId ?? "Inconnu"})',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           );
                         }).toList(),
@@ -151,7 +158,11 @@ class _RecordBirthScreenState extends ConsumerState<RecordBirthScreen> {
                       );
                     },
                     loading: () => const LinearProgressIndicator(),
-                    error: (e, _) => Text('Erreur: $e'),
+                    error: (e, _) => ErrorRetryCard(
+                      compact: true,
+                      message: 'Impossible de charger les gestations : $e',
+                      onRetry: () => ref.refresh(pregnanciesProvider),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   ListTile(

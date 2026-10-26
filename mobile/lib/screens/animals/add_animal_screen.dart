@@ -3,6 +3,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/colors.dart';
+import '../../core/utils/formatters.dart';
+import '../../core/widgets/animal_photo_avatar.dart';
+import '../../core/widgets/error_retry_card.dart';
 import '../../core/widgets/sheep_hoof_icon.dart';
 import '../../providers/animals_provider.dart';
 
@@ -27,7 +30,44 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
   int? _selectedSectorId;
   String _selectedSex = 'female';
   String _selectedOrigin = 'purchase';
+  DateTime? _selectedBirthDate;
+  String? _photoDataUrl;
   bool _isSubmitting = false;
+
+  Future<void> _pickPhoto() async {
+    final res = await showAnimalPhotoPickerSheet(
+      context,
+      hasCurrentPhoto: _photoDataUrl != null,
+    );
+    if (res == null) return;
+    if (res.removed) {
+      setState(() => _photoDataUrl = null);
+    } else if (res.dataUrl != null) {
+      setState(() => _photoDataUrl = res.dataUrl);
+    }
+  }
+
+  Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedBirthDate ?? now,
+      firstDate: DateTime(now.year - 15),
+      lastDate: now,
+      helpText: 'Sélectionner la date de naissance',
+      cancelText: 'Annuler',
+      confirmText: 'Valider',
+    );
+    if (picked != null) {
+      setState(() => _selectedBirthDate = picked);
+    }
+  }
+
+  String _formatIsoDate(DateTime d) {
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$m-$day';
+  }
 
   @override
   void dispose() {
@@ -58,12 +98,20 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
         'physical_tag': _tagController.text.trim().isEmpty
             ? null
             : _tagController.text.trim(),
+        'photo_url': _photoDataUrl,
         'breed_id': _selectedBreedId,
         'sex': _selectedSex,
+        'birth_date': _selectedBirthDate != null
+            ? _formatIsoDate(_selectedBirthDate!)
+            : null,
         'origin': _selectedOrigin,
         'current_sector_id': _selectedSectorId,
-        'current_weight_kg': double.tryParse(_weightController.text),
-        'purchase_price_cfa': double.tryParse(_priceController.text),
+        'current_weight_kg': double.tryParse(
+          _weightController.text.replaceAll(',', '.'),
+        ),
+        'purchase_price_cfa': double.tryParse(
+          _priceController.text.replaceAll(',', '.'),
+        ),
         'body_condition': 'normal',
         'status': 'active',
         'notes': _notesController.text.trim().isEmpty
@@ -71,8 +119,10 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
             : _notesController.text.trim(),
       };
 
-      await ref.read(animalActionsServiceProvider).createAnimal(payload);
-      ref.invalidate(animalsListProvider);
+      final created = await ref
+          .read(animalActionsServiceProvider)
+          .createAnimal(payload);
+      ref.read(animalsListProvider.notifier).upsertAnimal(created);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -106,6 +156,75 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Photo de l'ovin (optionnel)
+            Center(
+              child: GestureDetector(
+                onTap: _pickPhoto,
+                child: Column(
+                  children: [
+                    Stack(
+                      children: [
+                        Container(
+                          width: 96,
+                          height: 96,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.primaryContainer,
+                            border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.25),
+                              width: 2,
+                            ),
+                          ),
+                          child: AnimalPhotoImage(
+                            photoUrl: _photoDataUrl,
+                            size: 96,
+                            fallback: const Center(
+                              child: Icon(
+                                LucideIcons.camera,
+                                size: 32,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: Icon(
+                              _photoDataUrl != null
+                                  ? LucideIcons.pencil
+                                  : LucideIcons.plus,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _photoDataUrl != null
+                          ? 'Modifier la photo de l\'ovin'
+                          : 'Ajouter une photo (optionnel)',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
             // Identifiants
             Card(
               child: Padding(
@@ -180,7 +299,8 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                     breedsAsync.when(
                       data: (breeds) {
                         return DropdownButtonFormField<int>(
-                          value: _selectedBreedId,
+                          initialValue: _selectedBreedId,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Race ovine *',
                             prefixIcon: Icon(LucideIcons.folders),
@@ -188,7 +308,11 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                           items: breeds.map((b) {
                             return DropdownMenuItem<int>(
                               value: b.id,
-                              child: Text(b.name),
+                              child: Text(
+                                b.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             );
                           }).toList(),
                           onChanged: (val) =>
@@ -196,11 +320,16 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                         );
                       },
                       loading: () => const LinearProgressIndicator(),
-                      error: (e, _) => Text('Erreur: $e'),
+                      error: (e, _) => ErrorRetryCard(
+                        compact: true,
+                        message: 'Impossible de charger les races : $e',
+                        onRetry: () => ref.refresh(breedsProvider),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _selectedSex,
+                      initialValue: _selectedSex,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Sexe *',
                         prefixIcon: Icon(LucideIcons.venusAndMars),
@@ -208,15 +337,55 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                       items: const [
                         DropdownMenuItem(
                           value: 'female',
-                          child: Text('Femelle (Brebis)'),
+                          child: Text(
+                            'Femelle (Brebis)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         DropdownMenuItem(
                           value: 'male',
-                          child: Text('Mâle (Bélier)'),
+                          child: Text(
+                            'Mâle (Bélier)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                       onChanged: (val) =>
                           setState(() => _selectedSex = val ?? 'female'),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: _pickBirthDate,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Date de naissance (optionnel)',
+                          prefixIcon: const Icon(LucideIcons.calendarDays),
+                          suffixIcon: _selectedBirthDate != null
+                              ? IconButton(
+                                  icon: const Icon(LucideIcons.x, size: 18),
+                                  tooltip: 'Effacer la date',
+                                  onPressed: () =>
+                                      setState(() => _selectedBirthDate = null),
+                                )
+                              : const Icon(LucideIcons.chevronDown, size: 18),
+                        ),
+                        child: Text(
+                          _selectedBirthDate != null
+                              ? Formatters.formatDate(_selectedBirthDate)
+                              : 'Non renseignée (cliquer pour choisir)',
+                          style: TextStyle(
+                            color: _selectedBirthDate != null
+                                ? AppColors.textPrimary
+                                : AppColors.textMuted,
+                            fontWeight: _selectedBirthDate != null
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -242,7 +411,8 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                     sectorsAsync.when(
                       data: (sectors) {
                         return DropdownButtonFormField<int>(
-                          value: _selectedSectorId,
+                          initialValue: _selectedSectorId,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Enclos / Secteur initial',
                             prefixIcon: Icon(LucideIcons.doorOpen),
@@ -261,7 +431,11 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                         );
                       },
                       loading: () => const LinearProgressIndicator(),
-                      error: (e, _) => Text('Erreur: $e'),
+                      error: (e, _) => ErrorRetryCard(
+                        compact: true,
+                        message: 'Impossible de charger les enclos : $e',
+                        onRetry: () => ref.refresh(sectorsProvider),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(

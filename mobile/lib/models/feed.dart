@@ -21,6 +21,24 @@ class FeedProduct {
     this.isLowStock = false,
   });
 
+  FeedProduct copyWith({
+    double? currentStock,
+    bool? isLowStock,
+  }) {
+    final nextStock = currentStock ?? this.currentStock;
+    return FeedProduct(
+      id: id,
+      name: name,
+      category: category,
+      unit: unit,
+      supplier: supplier,
+      unitPriceCfa: unitPriceCfa,
+      currentStock: nextStock,
+      minStockThreshold: minStockThreshold,
+      isLowStock: isLowStock ?? (nextStock <= minStockThreshold),
+    );
+  }
+
   factory FeedProduct.fromJson(Map<String, dynamic> json) {
     return FeedProduct(
       id: json['id'] as int,

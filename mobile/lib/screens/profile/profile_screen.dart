@@ -461,8 +461,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                   color: isSelected
                       ? AppColors.primary
                       : AppColors.textSecondary,
@@ -564,47 +564,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: Colors.white,
-                        letterSpacing: -0.4,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       email,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withValues(alpha: 0.7),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
-                        vertical: 5,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.gold.withValues(alpha: 0.18),
+                        color: AppColors.goldLight,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: AppColors.gold.withValues(alpha: 0.45),
-                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(
                             LucideIcons.award,
-                            size: 14,
-                            color: AppColors.gold,
+                            size: 15,
+                            color: AppColors.primary,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             _translateRole(role),
                             style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.gold,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
@@ -619,11 +615,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           vertical: 12,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.22),
+                          color: Colors.white.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.08),
-                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -635,7 +628,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             Container(
                               height: 24,
                               width: 1,
-                              color: Colors.white.withValues(alpha: 0.15),
+                              color: Colors.white.withValues(alpha: 0.25),
                             ),
                             _buildMiniMetric(
                               '${d.sectors.length}',
@@ -644,7 +637,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             Container(
                               height: 24,
                               width: 1,
-                              color: Colors.white.withValues(alpha: 0.15),
+                              color: Colors.white.withValues(alpha: 0.25),
                             ),
                             _buildMiniMetric(
                               '${d.activePregnancies}',
@@ -1003,17 +996,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           value,
           style: const TextStyle(
             fontSize: 18,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             color: Colors.white,
           ),
         ),
         const SizedBox(height: 2),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            color: Colors.white.withValues(alpha: 0.7),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
           ),
         ),
       ],
@@ -1043,7 +1036,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
               ),

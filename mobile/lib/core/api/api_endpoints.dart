@@ -11,7 +11,7 @@ class ApiEndpoints {
 
   /// Remplacer par l'URL exacte de ton service Cloud Run déployé sur GCP :
   static const String cloudRunBaseUrl =
-      'https://jurgui-346078879462.europe-west1.run.app/';
+      'https://jurgui-346078879462.europe-west1.run.app/api/v1';
 
   static String get baseUrl {
     if (_envBaseUrl.isNotEmpty) {

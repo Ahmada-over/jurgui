@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_endpoints.dart';
 import '../models/animal.dart';
+import 'dashboard_provider.dart';
 
 class AnimalsFilter {
   final int? breedId;
@@ -60,22 +61,51 @@ final sectorsProvider = FutureProvider<List<Sector>>((ref) async {
   return (res.data as List<dynamic>).map((s) => Sector.fromJson(s as Map<String, dynamic>)).toList();
 });
 
-final animalsListProvider = FutureProvider<List<Animal>>((ref) async {
-  final filter = ref.watch(animalsFilterProvider);
-  final api = ApiClient();
+class AnimalsListNotifier extends AsyncNotifier<List<Animal>> {
+  @override
+  Future<List<Animal>> build() async {
+    final filter = ref.watch(animalsFilterProvider);
+    final api = ApiClient();
 
-  final queryParams = <String, dynamic>{
-    'status': filter.status ?? 'active',
-  };
-  if (filter.breedId != null) queryParams['breed_id'] = filter.breedId;
-  if (filter.sectorId != null) queryParams['sector_id'] = filter.sectorId;
-  if (filter.sex != null) queryParams['sex'] = filter.sex;
-  if (filter.searchQuery != null && filter.searchQuery!.isNotEmpty) {
-    queryParams['search'] = filter.searchQuery;
+    final queryParams = <String, dynamic>{
+      'status': filter.status ?? 'active',
+    };
+    if (filter.breedId != null) queryParams['breed_id'] = filter.breedId;
+    if (filter.sectorId != null) queryParams['sector_id'] = filter.sectorId;
+    if (filter.sex != null) queryParams['sex'] = filter.sex;
+    if (filter.searchQuery != null && filter.searchQuery!.isNotEmpty) {
+      queryParams['search'] = filter.searchQuery;
+    }
+
+    final res = await api.dio.get(ApiEndpoints.animals, queryParameters: queryParams);
+    return (res.data as List<dynamic>)
+        .map((a) => Animal.fromJson(a as Map<String, dynamic>))
+        .toList();
   }
 
-  final res = await api.dio.get(ApiEndpoints.animals, queryParameters: queryParams);
-  return (res.data as List<dynamic>).map((a) => Animal.fromJson(a as Map<String, dynamic>)).toList();
+  /// Met à jour instantanément la liste en mémoire sans attendre un nouvel appel réseau
+  void upsertAnimal(Animal animal) {
+    final current = state.value;
+    if (current != null) {
+      final idx = current.indexWhere((a) => a.id == animal.id);
+      if (idx >= 0) {
+        final next = [...current];
+        next[idx] = animal;
+        state = AsyncData(next);
+      } else {
+        state = AsyncData([animal, ...current]);
+      }
+    } else {
+      ref.invalidateSelf();
+    }
+    ref.invalidate(dashboardProvider);
+    ref.invalidate(sectorsProvider);
+  }
+}
+
+final animalsListProvider =
+    AsyncNotifierProvider<AnimalsListNotifier, List<Animal>>(() {
+  return AnimalsListNotifier();
 });
 
 final animalDetailProvider = FutureProvider.family<Animal, String>((ref, animalId) async {
@@ -92,18 +122,25 @@ class AnimalActionsService {
     return Animal.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<void> moveAnimalSector(String animalId, int toSectorId, String reason) async {
-    await _api.dio.post(
+  Future<Animal> updateAnimal(String animalId, Map<String, dynamic> data) async {
+    final res = await _api.dio.put('${ApiEndpoints.animals}/$animalId', data: data);
+    return Animal.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<AnimalMovement> moveAnimalSector(String animalId, int toSectorId, String reason) async {
+    final res = await _api.dio.post(
       '${ApiEndpoints.animals}/$animalId/move',
       data: {'to_sector_id': toSectorId, 'reason': reason},
     );
+    return AnimalMovement.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<void> addWeight(String animalId, double weightKg, String? notes) async {
-    await _api.dio.post(
+  Future<WeightRecord> addWeight(String animalId, double weightKg, String? notes) async {
+    final res = await _api.dio.post(
       '${ApiEndpoints.animals}/$animalId/weights',
       data: {'weight_kg': weightKg, 'notes': notes},
     );
+    return WeightRecord.fromJson(res.data as Map<String, dynamic>);
   }
 }
 

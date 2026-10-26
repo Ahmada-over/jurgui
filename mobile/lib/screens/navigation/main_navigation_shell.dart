@@ -28,7 +28,7 @@ class MainNavigationShell extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: SizedBox(
-            height: 64,
+            height: 68,
             child: Row(
               children: [
                 _buildNavItem(
@@ -67,7 +67,7 @@ class MainNavigationShell extends StatelessWidget {
     required String label,
   }) {
     final isSelected = navigationShell.currentIndex == index;
-    final itemColor = isSelected ? AppColors.goldDark : AppColors.textSecondary;
+    final itemColor = isSelected ? AppColors.primary : AppColors.textSecondary;
 
     return Expanded(
       child: Semantics(
@@ -87,22 +87,14 @@ class MainNavigationShell extends StatelessWidget {
                         size: 21,
                         color: itemColor,
                       ),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  child: isSelected
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 3),
-                          child: Text(
-                            label,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        )
-                      : const SizedBox.shrink(),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: itemColor,
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  ),
                 ),
               ],
             ),

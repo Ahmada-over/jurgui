@@ -159,6 +159,66 @@ class Animal {
   bool get isFemale => sex.toLowerCase() == 'female';
   bool get isMale => sex.toLowerCase() == 'male';
 
+  Animal copyWith({
+    String? id,
+    String? name,
+    String? physicalTag,
+    bool clearPhysicalTag = false,
+    String? photoUrl,
+    bool clearPhotoUrl = false,
+    int? breedId,
+    String? sex,
+    DateTime? birthDate,
+    bool clearBirthDate = false,
+    int? estimatedAgeMonths,
+    String? origin,
+    DateTime? entryDate,
+    double? purchasePriceCfa,
+    bool clearPurchasePrice = false,
+    String? status,
+    int? currentSectorId,
+    double? currentWeightKg,
+    String? bodyCondition,
+    String? reproductionStatus,
+    String? motherId,
+    bool clearMotherId = false,
+    String? fatherId,
+    bool clearFatherId = false,
+    String? notes,
+    bool clearNotes = false,
+    Breed? breed,
+    Sector? currentSector,
+    List<WeightRecord>? weightRecords,
+    List<AnimalMovement>? movements,
+  }) {
+    return Animal(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      physicalTag: clearPhysicalTag ? null : (physicalTag ?? this.physicalTag),
+      photoUrl: clearPhotoUrl ? null : (photoUrl ?? this.photoUrl),
+      breedId: breedId ?? this.breedId,
+      sex: sex ?? this.sex,
+      birthDate: clearBirthDate ? null : (birthDate ?? this.birthDate),
+      estimatedAgeMonths: estimatedAgeMonths ?? this.estimatedAgeMonths,
+      origin: origin ?? this.origin,
+      entryDate: entryDate ?? this.entryDate,
+      purchasePriceCfa:
+          clearPurchasePrice ? null : (purchasePriceCfa ?? this.purchasePriceCfa),
+      status: status ?? this.status,
+      currentSectorId: currentSectorId ?? this.currentSectorId,
+      currentWeightKg: currentWeightKg ?? this.currentWeightKg,
+      bodyCondition: bodyCondition ?? this.bodyCondition,
+      reproductionStatus: reproductionStatus ?? this.reproductionStatus,
+      motherId: clearMotherId ? null : (motherId ?? this.motherId),
+      fatherId: clearFatherId ? null : (fatherId ?? this.fatherId),
+      notes: clearNotes ? null : (notes ?? this.notes),
+      breed: breed ?? this.breed,
+      currentSector: currentSector ?? this.currentSector,
+      weightRecords: weightRecords ?? this.weightRecords,
+      movements: movements ?? this.movements,
+    );
+  }
+
   factory Animal.fromJson(Map<String, dynamic> json) {
     return Animal(
       id: json['id'] as String,

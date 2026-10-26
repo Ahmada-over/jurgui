@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from app.core.database import get_db
 from app.models.animal import Animal, AnimalMovement, WeightRecord, BodyConditionRecord
 from app.models.breed import Breed
@@ -36,7 +36,7 @@ async def list_animals(
 ):
     query = (
         select(Animal)
-        .options(selectinload(Animal.breed), selectinload(Animal.current_sector))
+        .options(joinedload(Animal.breed), joinedload(Animal.current_sector))
         .offset(skip)
         .limit(limit)
     )
@@ -145,10 +145,10 @@ async def create_animal(
         
     await db.commit()
     
-    # Reload with relationships
+    # Reload with relationships in a single JOIN query
     query = (
         select(Animal)
-        .options(selectinload(Animal.breed), selectinload(Animal.current_sector))
+        .options(joinedload(Animal.breed), joinedload(Animal.current_sector))
         .where(Animal.id == new_animal.id)
     )
     res = await db.execute(query)
@@ -165,8 +165,8 @@ async def get_animal(
     query = (
         select(Animal)
         .options(
-            selectinload(Animal.breed),
-            selectinload(Animal.current_sector),
+            joinedload(Animal.breed),
+            joinedload(Animal.current_sector),
             selectinload(Animal.movements),
             selectinload(Animal.weight_records),
             selectinload(Animal.body_condition_records),
@@ -198,10 +198,10 @@ async def update_animal(
         
     await db.commit()
     
-    # Reload with relations
+    # Reload with relations in a single JOIN query
     query = (
         select(Animal)
-        .options(selectinload(Animal.breed), selectinload(Animal.current_sector))
+        .options(joinedload(Animal.breed), joinedload(Animal.current_sector))
         .where(Animal.id == animal_id)
     )
     res = await db.execute(query)
