@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class Task(Base):
@@ -20,7 +19,7 @@ class Task(Base):
     assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     animal = relationship("Animal")
     sector = relationship("Sector")
@@ -43,7 +42,7 @@ class Notification(Base):
     related_entity_id = Column(String(50), nullable=True)
     
     scheduled_for = Column(DateTime, nullable=True)
-    sent_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    sent_at = Column(DateTime, default=utc_now, nullable=False)
     is_fcm_sent = Column(Boolean, default=False, nullable=False)
 
     target_user = relationship("User")

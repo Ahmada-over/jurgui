@@ -1,7 +1,6 @@
 import enum
-from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class UserRole(str, enum.Enum):
@@ -20,5 +19,5 @@ class User(Base):
     role = Column(String(50), default=UserRole.EMPLOYEE.value, nullable=False)
     phone = Column(String(50), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)

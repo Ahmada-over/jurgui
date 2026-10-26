@@ -35,89 +35,42 @@ class DashboardScreen extends ConsumerWidget {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              gradient: AppColors.heroGradient,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: AppColors.softShadow,
-                            ),
-                            child: const Center(
-                              child: SheepHoofIcon(
-                                color: AppColors.gold,
-                                size: 24,
-                              ),
-                            ),
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          gradient: AppColors.heroGradient,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: AppColors.softShadow,
+                        ),
+                        child: const Center(
+                          child: SheepHoofIcon(
+                            color: AppColors.gold,
+                            size: 24,
                           ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Jur-gui',
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: -0.5,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                'Bonjour, $userName',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                        ),
                       ),
-                      Row(
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          IconButton(
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                side: const BorderSide(
-                                  color: AppColors.divider,
-                                ),
-                              ),
+                          const Text(
+                            'Jur-gui',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.5,
+                              color: AppColors.textPrimary,
                             ),
-                            icon: const Icon(LucideIcons.refreshCw, size: 20),
-                            onPressed: () => ref.refresh(dashboardProvider),
                           ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            style: IconButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                side: const BorderSide(
-                                  color: AppColors.divider,
-                                ),
-                              ),
-                            ),
-                            icon: const Icon(
-                              LucideIcons.logOut,
-                              size: 20,
+                          Text(
+                            'Bonjour, $userName',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                               color: AppColors.textSecondary,
                             ),
-                            onPressed: () async {
-                              await ref.read(authProvider.notifier).logout();
-                              if (context.mounted) context.go('/login');
-                            },
                           ),
                         ],
                       ),
@@ -199,19 +152,13 @@ class DashboardScreen extends ConsumerWidget {
                             children: [
                               Expanded(
                                 child: _buildStatTile(
-                                  title: 'Alertes Stocks',
-                                  value: '${data.lowStockAlerts.length}',
-                                  unit: data.lowStockAlerts.isEmpty
-                                      ? 'critiques'
-                                      : 'à réappro',
-                                  icon: LucideIcons.package,
-                                  accentColor: data.lowStockAlerts.isEmpty
-                                      ? AppColors.primaryAccent
-                                      : AppColors.danger,
-                                  badgeText: data.lowStockAlerts.isEmpty
-                                      ? 'Optimal'
-                                      : 'Action requise',
-                                  onTap: () => context.go('/feed'),
+                                  title: 'Secteurs & Enclos',
+                                  value: '${data.sectors.length}',
+                                  unit: 'enclos',
+                                  icon: LucideIcons.layoutGrid,
+                                  accentColor: AppColors.primaryAccent,
+                                  badgeText: 'Optimal',
+                                  onTap: () => context.go('/animals'),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -440,10 +387,10 @@ class DashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(width: 10),
           _buildActionPill(
-            icon: LucideIcons.packageOpen,
-            label: 'Distribuer ration',
+            icon: LucideIcons.user,
+            label: 'Mon profil',
             color: AppColors.primaryLight,
-            onTap: () => context.go('/feed'),
+            onTap: () => context.go('/profile'),
           ),
         ],
       ),

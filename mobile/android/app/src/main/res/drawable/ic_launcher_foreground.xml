@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Cercle doré Prestige Ladoum dans la zone sûre Adaptive Icon -->
+    <path
+        android:pathData="M54,26 A28,28 0 1,1 53.99,26 Z"
+        android:strokeWidth="1.8"
+        android:strokeColor="#FFD4AF37"
+        android:fillColor="#00000000" />
+
+    <!-- Empreinte de sabot fendu (SheepHoofIcon) centrée dans la safe zone (34..74) -->
+    <group
+        android:translateX="34"
+        android:translateY="34"
+        android:scaleX="0.40"
+        android:scaleY="0.40">
+        <!-- Onglon gauche -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M44,10 C24,14 14,36 17,56 C19,67 30,72 40,69 C45,67 46,60 46,48 L46,16 C46,11 45,10 44,10 Z" />
+        <!-- Onglon droit -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M56,10 C76,14 86,36 83,56 C81,67 70,72 60,69 C55,67 54,60 54,48 L54,16 C54,11 55,10 56,10 Z" />
+        <!-- Ergot arrière gauche -->
+        <group
+            android:translateX="31"
+            android:translateY="83"
+            android:rotation="-12.6">
+            <path
+                android:fillColor="#FFFFFFFF"
+                android:pathData="M-7.5,0 A7.5,6 0 1,0 7.5,0 A7.5,6 0 1,0 -7.5,0 Z" />
+        </group>
+        <!-- Ergot arrière droit -->
+        <group
+            android:translateX="69"
+            android:translateY="83"
+            android:rotation="12.6">
+            <path
+                android:fillColor="#FFFFFFFF"
+                android:pathData="M-7.5,0 A7.5,6 0 1,0 7.5,0 A7.5,6 0 1,0 -7.5,0 Z" />
+        </group>
+    </group>
+</vector>

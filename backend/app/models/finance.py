@@ -1,7 +1,7 @@
-from datetime import datetime, timezone, date
+from datetime import date
 from sqlalchemy import Column, Integer, String, Text, Float, Date, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class Expense(Base):
@@ -15,7 +15,7 @@ class Expense(Base):
     receipt_url = Column(String(500), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     user = relationship("User")
 
@@ -33,7 +33,7 @@ class Revenue(Base):
     receipt_url = Column(String(500), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     animal = relationship("Animal")
     user = relationship("User")

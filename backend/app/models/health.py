@@ -1,7 +1,7 @@
-from datetime import datetime, timezone, date
+from datetime import date
 from sqlalchemy import Column, Integer, String, Text, Float, Date, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class HealthRecord(Base):
@@ -9,7 +9,7 @@ class HealthRecord(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     animal_id = Column(String(50), ForeignKey("animals.id"), nullable=False, index=True)
-    observation_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    observation_date = Column(DateTime, default=utc_now, nullable=False)
     symptoms = Column(Text, nullable=False)
     general_condition = Column(String(50), nullable=True)  # good, weakened, critical
     appetite_behavior = Column(String(50), nullable=True)  # normal, reduced, absent
@@ -18,7 +18,7 @@ class HealthRecord(Base):
     severity = Column(String(20), default="low", nullable=False)  # low, medium, high, critical
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     animal = relationship("Animal")
     user = relationship("User")
@@ -42,7 +42,7 @@ class Treatment(Base):
     administered_by = Column(String(150), nullable=True)
     result = Column(String(100), nullable=True)  # healed, in_progress, ineffective
     next_check_date = Column(Date, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     health_record = relationship("HealthRecord", back_populates="treatments")
     animal = relationship("Animal")
@@ -59,7 +59,7 @@ class Vaccination(Base):
     administered_by = Column(String(150), nullable=True)
     next_due_date = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     animal = relationship("Animal")
 
@@ -79,7 +79,7 @@ class HygieneTask(Base):
     assigned_to_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     completed_at = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     sector = relationship("Sector")
     assigned_to = relationship("User")

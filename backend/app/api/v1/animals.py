@@ -261,7 +261,7 @@ async def add_animal_weight(
     record = WeightRecord(
         animal_id=animal.id,
         weight_kg=weight_in.weight_kg,
-        recorded_at=weight_in.recorded_at or datetime.now(timezone.utc),
+        recorded_at=(weight_in.recorded_at or datetime.now(timezone.utc)).replace(tzinfo=None),
         recorded_by_user_id=current_user.id,
         notes=weight_in.notes
     )
@@ -287,7 +287,7 @@ async def add_animal_body_condition(
     record = BodyConditionRecord(
         animal_id=animal.id,
         condition=cond_in.condition.lower(),
-        recorded_at=cond_in.recorded_at or datetime.now(timezone.utc),
+        recorded_at=(cond_in.recorded_at or datetime.now(timezone.utc)).replace(tzinfo=None),
         recorded_by_user_id=current_user.id,
         notes=cond_in.notes
     )

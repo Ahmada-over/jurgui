@@ -49,8 +49,8 @@ class MainNavigationShell extends StatelessWidget {
                 ),
                 _buildNavItem(
                   index: 3,
-                  icon: LucideIcons.package,
-                  label: 'Stocks',
+                  icon: LucideIcons.user,
+                  label: 'Profil',
                 ),
               ],
             ),

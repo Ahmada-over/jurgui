@@ -30,6 +30,11 @@ htmlcov/
 build/
 *.lock
 
+# Android Play Store signing keys
+*.jks
+*.keystore
+mobile/android/key.properties
+
 # IDE & OS
 .DS_Store
 .idea/

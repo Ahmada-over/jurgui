@@ -75,7 +75,7 @@ async def update_task(
     if task_in.status is not None:
         task.status = task_in.status
         if task_in.status == "completed":
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     if task_in.assigned_user_id is not None:
         task.assigned_user_id = task_in.assigned_user_id
 

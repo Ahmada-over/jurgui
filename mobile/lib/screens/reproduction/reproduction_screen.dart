@@ -67,15 +67,6 @@ class _ReproductionScreenState extends ConsumerState<ReproductionScreen>
                 ),
               ),
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(LucideIcons.refreshCw),
-                onPressed: () {
-                  ref.invalidate(pregnanciesProvider);
-                  ref.invalidate(matingsProvider);
-                },
-              ),
-            ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(42),
               child: Padding(

@@ -1,7 +1,7 @@
-from datetime import datetime, timezone, date
+from datetime import date
 from sqlalchemy import Column, Integer, String, Text, Float, Date, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class FeedProduct(Base):
@@ -18,7 +18,7 @@ class FeedProduct(Base):
     expiration_date = Column(Date, nullable=True)
     storage_conditions = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     inventory_movements = relationship("InventoryMovement", back_populates="product", cascade="all, delete-orphan")
 
@@ -34,7 +34,7 @@ class FeedRation(Base):
     instructions = Column(Text, nullable=True)
     status = Column(String(50), default="to_prepare", nullable=False)  # to_prepare, distributed, cancelled
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     created_by = relationship("User")
     items = relationship("RationItem", back_populates="ration", cascade="all, delete-orphan")
@@ -65,7 +65,7 @@ class FeedingRecord(Base):
     quantity_planned = Column(Float, nullable=True)
     quantity_served = Column(Float, nullable=False)
     unit = Column(String(20), default="kg", nullable=False)
-    recorded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    recorded_at = Column(DateTime, default=utc_now, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     notes = Column(Text, nullable=True)
 
@@ -89,7 +89,7 @@ class InventoryMovement(Base):
     expiry_date = Column(Date, nullable=True)
     reason = Column(Text, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    recorded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    recorded_at = Column(DateTime, default=utc_now, nullable=False)
 
     product = relationship("FeedProduct", back_populates="inventory_movements")
     user = relationship("User")

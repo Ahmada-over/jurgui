@@ -176,7 +176,7 @@ async def complete_hygiene_task(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tâche d'hygiène introuvable")
 
     task.status = "completed"
-    task.completed_at = datetime.now(timezone.utc)
+    task.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     if notes:
         task.notes = (task.notes or "") + f" | Réalisation: {notes}"
 

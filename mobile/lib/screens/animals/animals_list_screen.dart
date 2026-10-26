@@ -21,23 +21,6 @@ class AnimalsListScreen extends ConsumerWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Cheptel Ovin'),
-        actions: [
-          IconButton(
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: AppColors.divider),
-              ),
-            ),
-            icon: const Icon(LucideIcons.refreshCw, size: 20),
-            onPressed: () {
-              ref.invalidate(animalsListProvider);
-              ref.invalidate(breedsProvider);
-            },
-          ),
-          const SizedBox(width: 12),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primary,

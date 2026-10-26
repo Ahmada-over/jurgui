@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class AuditLog(Base):
@@ -14,7 +13,7 @@ class AuditLog(Base):
     entity_id = Column(String(50), nullable=False)
     changes_json = Column(Text, nullable=True)  # JSON diff string
     ip_address = Column(String(50), nullable=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    timestamp = Column(DateTime, default=utc_now, nullable=False)
 
     user = relationship("User")
 
@@ -30,6 +29,6 @@ class Attachment(Base):
     file_size = Column(Integer, nullable=False)  # In bytes
     mime_type = Column(String(100), nullable=False)
     uploaded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    uploaded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    uploaded_at = Column(DateTime, default=utc_now, nullable=False)
 
     uploaded_by = relationship("User")

@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class Breed(Base):
@@ -11,4 +10,4 @@ class Breed(Base):
     description = Column(Text, nullable=True)
     origin = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)

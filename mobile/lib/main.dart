@@ -6,6 +6,7 @@ import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/navigation/main_navigation_shell.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/animals/animals_list_screen.dart';
@@ -14,7 +15,7 @@ import 'screens/animals/add_animal_screen.dart';
 import 'screens/reproduction/reproduction_screen.dart';
 import 'screens/reproduction/add_mating_screen.dart';
 import 'screens/reproduction/record_birth_screen.dart';
-import 'screens/feed_stock/feed_stock_screen.dart';
+import 'screens/profile/profile_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,11 +36,13 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/dashboard',
     redirect: (context, state) {
       if (authState.isLoading) return null;
-      final isLoggingIn = state.matchedLocation == '/login';
-      if (!authState.isAuthenticated && !isLoggingIn) {
+      final isAuthRoute =
+          state.matchedLocation == '/login' ||
+          state.matchedLocation == '/register';
+      if (!authState.isAuthenticated && !isAuthRoute) {
         return '/login';
       }
-      if (authState.isAuthenticated && isLoggingIn) {
+      if (authState.isAuthenticated && isAuthRoute) {
         return '/dashboard';
       }
       return null;
@@ -48,6 +51,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -81,12 +88,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Branch 3: Stocks & Aliments
+          // Branch 3: Profil
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/feed',
-                builder: (context, state) => const FeedStockScreen(),
+                path: '/profile',
+                builder: (context, state) => const ProfileScreen(),
               ),
             ],
           ),

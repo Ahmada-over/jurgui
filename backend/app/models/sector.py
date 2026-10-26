@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, DateTime
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class Sector(Base):
@@ -12,4 +11,4 @@ class Sector(Base):
     estimated_capacity = Column(Integer, default=0, nullable=False)
     status = Column(String(50), default="active", nullable=False)  # active, maintenance, quarantine
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)

@@ -11,7 +11,7 @@ class ApiEndpoints {
 
   /// Remplacer par l'URL exacte de ton service Cloud Run déployé sur GCP :
   static const String cloudRunBaseUrl =
-      'https://jurgui-api-REMPLACER.europe-west1.run.app/api/v1';
+      'https://jurgui-346078879462.europe-west1.run.app/';
 
   static String get baseUrl {
     if (_envBaseUrl.isNotEmpty) {
@@ -35,7 +35,9 @@ class ApiEndpoints {
 
   // Auth
   static const String login = '/auth/login';
+  static const String register = '/auth/register';
   static const String me = '/auth/me';
+  static const String users = '/auth/users';
 
   // Cheptel
   static const String breeds = '/breeds';

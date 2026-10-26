@@ -1,10 +1,23 @@
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 import ssl
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
 from app.core.config import settings
+
+
+def utc_now() -> datetime:
+    """Retourne la date/heure UTC sans tzinfo (compatible TIMESTAMP WITHOUT TIME ZONE sous asyncpg)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _strip_tz(val):
+    if isinstance(val, datetime) and val.tzinfo is not None:
+        return val.astimezone(timezone.utc).replace(tzinfo=None)
+    return val
 
 
 def _prepare_postgres_url_and_ssl(raw_url: str, default_ssl: bool) -> tuple[str, dict]:
@@ -65,6 +78,24 @@ engine_kwargs: dict = {
 }
 
 engine = create_async_engine(_db_url, **engine_kwargs)
+
+
+@event.listens_for(engine.sync_engine, "before_cursor_execute", retval=True)
+def _normalize_datetime_params(conn, cursor, statement, parameters, context, executemany):
+    """Convertit automatiquement tout datetime timezone-aware en UTC naïf pour asyncpg."""
+    if parameters:
+        if isinstance(parameters, dict):
+            parameters = {k: _strip_tz(v) for k, v in parameters.items()}
+        elif isinstance(parameters, tuple):
+            parameters = tuple(_strip_tz(v) for v in parameters)
+        elif isinstance(parameters, list):
+            parameters = [
+                tuple(_strip_tz(v) for v in row) if isinstance(row, tuple)
+                else ({k: _strip_tz(v) for k, v in row.items()} if isinstance(row, dict) else _strip_tz(row))
+                for row in parameters
+            ]
+    return statement, parameters
+
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

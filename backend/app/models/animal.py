@@ -1,7 +1,7 @@
-from datetime import datetime, timezone, date
+from datetime import date
 from sqlalchemy import Column, Integer, String, Text, Float, Date, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class Animal(Base):
@@ -34,8 +34,8 @@ class Animal(Base):
     father_id = Column(String(50), ForeignKey("animals.id"), nullable=True)
     
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     # Integrity constraint to prevent self-parentage
     __table_args__ = (
@@ -61,7 +61,7 @@ class AnimalMovement(Base):
     animal_id = Column(String(50), ForeignKey("animals.id"), nullable=False, index=True)
     from_sector_id = Column(Integer, ForeignKey("sectors.id"), nullable=True)
     to_sector_id = Column(Integer, ForeignKey("sectors.id"), nullable=False)
-    movement_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    movement_date = Column(DateTime, default=utc_now, nullable=False)
     moved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     reason = Column(Text, nullable=True)
 
@@ -77,7 +77,7 @@ class WeightRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     animal_id = Column(String(50), ForeignKey("animals.id"), nullable=False, index=True)
     weight_kg = Column(Float, nullable=False)
-    recorded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    recorded_at = Column(DateTime, default=utc_now, nullable=False)
     recorded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     notes = Column(Text, nullable=True)
 
@@ -91,7 +91,7 @@ class BodyConditionRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     animal_id = Column(String(50), ForeignKey("animals.id"), nullable=False, index=True)
     condition = Column(String(50), nullable=False)  # thin, normal, fat
-    recorded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    recorded_at = Column(DateTime, default=utc_now, nullable=False)
     recorded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     notes = Column(Text, nullable=True)
 

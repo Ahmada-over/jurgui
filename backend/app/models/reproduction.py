@@ -1,7 +1,6 @@
-from datetime import datetime, timezone, date
 from sqlalchemy import Column, Integer, String, Text, Date, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from app.core.database import Base
+from app.core.database import Base, utc_now
 
 
 class MatingEvent(Base):
@@ -15,7 +14,7 @@ class MatingEvent(Base):
     status = Column(String(50), default="observed", nullable=False)  # observed, declared, confirmed, to_verify
     notes = Column(Text, nullable=True)
     registered_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     female = relationship("Animal", foreign_keys=[female_id])
     ram = relationship("Animal", foreign_keys=[ram_id])
@@ -42,7 +41,7 @@ class Pregnancy(Base):
     
     status = Column(String(50), default="in_progress", nullable=False)  # in_progress, completed, aborted
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     female = relationship("Animal", foreign_keys=[female_id])
     ram = relationship("Animal", foreign_keys=[ram_id])
@@ -69,7 +68,7 @@ class Birth(Base):
     interventions = Column(Text, nullable=True)
     health_notes = Column(Text, nullable=True)
     registered_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     pregnancy = relationship("Pregnancy", back_populates="birth")
     female = relationship("Animal", foreign_keys=[female_id])
