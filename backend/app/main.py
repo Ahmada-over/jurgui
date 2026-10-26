@@ -89,9 +89,10 @@ app = FastAPI(
 )
 
 # CORS configuration for Flutter Mobile & Web clients
+_origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -116,5 +117,5 @@ async def health_check():
         "status": "healthy",
         "app": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "mode": "offline-ready / cloud-ready"
+        "environment": settings.ENVIRONMENT,
     }

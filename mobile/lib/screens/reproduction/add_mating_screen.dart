@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/colors.dart';
@@ -60,14 +61,19 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saillie et suivi de gestation enregistrés')),
+          const SnackBar(
+            content: Text('Saillie et suivi de gestation enregistrés'),
+          ),
         );
         context.pop();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur : $e'), backgroundColor: AppColors.danger),
+          SnackBar(
+            content: Text('Erreur : $e'),
+            backgroundColor: AppColors.danger,
+          ),
         );
       }
     } finally {
@@ -81,9 +87,7 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
     final calculatedExpectedBirth = _matingDate.add(const Duration(days: 150));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Déclarer une Saillie'),
-      ),
+      appBar: AppBar(title: const Text('Déclarer une Saillie')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -93,7 +97,10 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Reproducteurs', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Reproducteurs',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 12),
 
                   // Female dropdown
@@ -101,18 +108,27 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
                     data: (animals) {
                       final females = animals.where((a) => a.isFemale).toList();
                       return DropdownButtonFormField<String>(
-                        value: _selectedFemaleId,
+                        initialValue: _selectedFemaleId,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Brebis (Femelle) *',
-                          prefixIcon: Icon(Icons.female, color: Colors.pink),
+                          prefixIcon: Icon(
+                            LucideIcons.venus,
+                            color: Colors.pink,
+                          ),
                         ),
                         items: females.map((f) {
                           return DropdownMenuItem(
                             value: f.id,
-                            child: Text('${f.name} (${f.id} - ${f.breed?.name ?? ""})'),
+                            child: Text(
+                              '${f.name} (${f.id} - ${f.breed?.name ?? ""})',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           );
                         }).toList(),
-                        onChanged: (val) => setState(() => _selectedFemaleId = val),
+                        onChanged: (val) =>
+                            setState(() => _selectedFemaleId = val),
                       );
                     },
                     loading: () => const LinearProgressIndicator(),
@@ -125,18 +141,27 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
                     data: (animals) {
                       final males = animals.where((a) => a.isMale).toList();
                       return DropdownButtonFormField<String>(
-                        value: _selectedRamId,
+                        initialValue: _selectedRamId,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Bélier (Reproducteur)',
-                          prefixIcon: Icon(Icons.male, color: Colors.blueAccent),
+                          prefixIcon: Icon(
+                            LucideIcons.mars,
+                            color: Colors.blueAccent,
+                          ),
                         ),
                         items: males.map((m) {
                           return DropdownMenuItem(
                             value: m.id,
-                            child: Text('${m.name} (${m.id} - ${m.breed?.name ?? ""})'),
+                            child: Text(
+                              '${m.name} (${m.id} - ${m.breed?.name ?? ""})',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           );
                         }).toList(),
-                        onChanged: (val) => setState(() => _selectedRamId = val),
+                        onChanged: (val) =>
+                            setState(() => _selectedRamId = val),
                       );
                     },
                     loading: () => const LinearProgressIndicator(),
@@ -155,14 +180,17 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Date & Conditions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Date & Conditions',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 12),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Date de la saillie'),
                     subtitle: Text(Formatters.formatDate(_matingDate)),
-                    leading: const Icon(Icons.calendar_today),
-                    trailing: const Icon(Icons.arrow_drop_down),
+                    leading: const Icon(LucideIcons.calendarDays),
+                    trailing: const Icon(LucideIcons.chevronDown),
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
@@ -177,21 +205,57 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _matingType,
-                    decoration: const InputDecoration(labelText: 'Type d\'accouplement'),
+                    initialValue: _matingType,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Type d\'accouplement',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 'natural', child: Text('Saillie naturelle en enclos')),
-                      DropdownMenuItem(value: 'assisted', child: Text('Saillie assistée / insémination')),
+                      DropdownMenuItem(
+                        value: 'natural',
+                        child: Text(
+                          'Saillie naturelle en enclos',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'assisted',
+                        child: Text(
+                          'Saillie assistée / insémination',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
-                    onChanged: (val) => setState(() => _matingType = val ?? 'natural'),
+                    onChanged: (val) =>
+                        setState(() => _matingType = val ?? 'natural'),
                   ),
                   const SizedBox(height: 12),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Activer le suivi de gestation (150 jours)'),
-                    subtitle: Text('Date prévisionnelle estimée : ${Formatters.formatDate(calculatedExpectedBirth)}'),
-                    value: _startPregnancyTracking,
-                    onChanged: (val) => setState(() => _startPregnancyTracking = val),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Suivi de gestation (150 jours)',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Naissance estimée : ${Formatters.formatDate(calculatedExpectedBirth)}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _startPregnancyTracking,
+                        onChanged: (val) =>
+                            setState(() => _startPregnancyTracking = val),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -206,7 +270,10 @@ class _AddMatingScreenState extends ConsumerState<AddMatingScreen> {
             ),
             child: _isSubmitting
                 ? const CircularProgressIndicator(color: Colors.white)
-                : const Text('Valider la saillie', style: TextStyle(fontSize: 16)),
+                : const Text(
+                    'Valider la saillie',
+                    style: TextStyle(fontSize: 16),
+                  ),
           ),
         ],
       ),

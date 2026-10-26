@@ -2,7 +2,25 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 
 class ApiEndpoints {
+  /// URL de production GCP Cloud Run (peut aussi être surchargée au build via
+  /// `--dart-define=API_BASE_URL=https://jurgui-api-xxx.a.run.app/api/v1`)
+  static const String _envBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
+
+  /// Remplacer par l'URL exacte de ton service Cloud Run déployé sur GCP :
+  static const String cloudRunBaseUrl =
+      'https://jurgui-api-REMPLACER.europe-west1.run.app/api/v1';
+
   static String get baseUrl {
+    if (_envBaseUrl.isNotEmpty) {
+      return _envBaseUrl;
+    }
+    // En mode release (Play Store / APK sur téléphone) ou si l'URL Cloud Run est renseignée
+    if (kReleaseMode || !cloudRunBaseUrl.contains('REMPLACER')) {
+      return cloudRunBaseUrl;
+    }
     if (kIsWeb) {
       return 'http://127.0.0.1:8002/api/v1';
     }

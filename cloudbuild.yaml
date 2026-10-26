@@ -1,0 +1,64 @@
+# Cloud Build — Jur-gui API → Cloud Run
+# Déclenché automatiquement sur push (ou manuellement via gcloud builds submit)
+#
+# Variables de substitution :
+#   _REGION        : région Cloud Run (ex: europe-west1)
+#   _SERVICE_NAME  : nom du service Cloud Run (ex: jurgui-api)
+#   _DATABASE_URL  : URL Neon (via Secret Manager)
+
+substitutions:
+  _REGION: europe-west1
+  _SERVICE_NAME: jurgui-api
+
+steps:
+  # 1. Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$SHORT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest'
+      - '-f'
+      - 'backend/Dockerfile'
+      - '.'
+
+  # 2. Push image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
+
+  # 3. Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$SHORT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'ENVIRONMENT=production,DATABASE_SSL=true'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '3'
+      - '--port'
+      - '8080'
+
+images:
+  - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

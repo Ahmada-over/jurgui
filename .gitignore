@@ -20,6 +20,7 @@ htmlcov/
 # Environment files
 .env
 .env.local
+.env.production
 
 # Flutter / Dart
 .dart_tool/

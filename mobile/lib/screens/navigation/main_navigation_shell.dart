@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/constants/colors.dart';
+import '../../core/widgets/sheep_hoof_icon.dart';
 
 class MainNavigationShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
-  const MainNavigationShell({
-    super.key,
-    required this.navigationShell,
-  });
+  const MainNavigationShell({super.key, required this.navigationShell});
 
   void _onItemTapped(int index) {
     navigationShell.goBranch(
@@ -22,47 +21,92 @@ class MainNavigationShell extends StatelessWidget {
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.white,
-          border: const Border(
-            top: BorderSide(color: AppColors.divider, width: 1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, -3),
-            ),
-          ],
+          border: Border(top: BorderSide(color: AppColors.divider)),
         ),
-        child: NavigationBar(
-          selectedIndex: navigationShell.currentIndex,
-          onDestinationSelected: _onItemTapped,
-          backgroundColor: Colors.white,
-          indicatorColor: AppColors.primaryContainer,
-          elevation: 0,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard, color: AppColors.primary),
-              label: 'Tableau de bord',
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              children: [
+                _buildNavItem(
+                  index: 0,
+                  icon: LucideIcons.layoutGrid,
+                  label: 'Aperçu',
+                ),
+                _buildNavItem(
+                  index: 1,
+                  customIconBuilder: (color) =>
+                      SheepHoofIcon(size: 21, color: color),
+                  label: 'Cheptel',
+                ),
+                _buildNavItem(
+                  index: 2,
+                  icon: LucideIcons.heart,
+                  label: 'Repro',
+                ),
+                _buildNavItem(
+                  index: 3,
+                  icon: LucideIcons.package,
+                  label: 'Stocks',
+                ),
+              ],
             ),
-            NavigationDestination(
-              icon: Icon(Icons.pets_outlined),
-              selectedIcon: Icon(Icons.pets, color: AppColors.primary),
-              label: 'Cheptel',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    IconData? icon,
+    Widget Function(Color color)? customIconBuilder,
+    required String label,
+  }) {
+    final isSelected = navigationShell.currentIndex == index;
+    final itemColor = isSelected ? AppColors.goldDark : AppColors.textSecondary;
+
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: label,
+        child: InkWell(
+          onTap: () => _onItemTapped(index),
+          child: SizedBox.expand(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                customIconBuilder != null
+                    ? customIconBuilder(itemColor)
+                    : Icon(
+                        icon,
+                        size: 21,
+                        color: itemColor,
+                      ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: isSelected
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ),
-            NavigationDestination(
-              icon: Icon(Icons.favorite_outline),
-              selectedIcon: Icon(Icons.favorite, color: AppColors.secondary),
-              label: 'Reproduction',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.inventory_2_outlined),
-              selectedIcon: Icon(Icons.inventory_2, color: AppColors.primary),
-              label: 'Stocks & Aliments',
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/colors.dart';
+import '../../core/widgets/sheep_hoof_icon.dart';
 import '../../providers/animals_provider.dart';
 
 class AddAnimalScreen extends ConsumerStatefulWidget {
@@ -53,7 +55,9 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
       final payload = {
         'id': _idController.text.trim(),
         'name': _nameController.text.trim(),
-        'physical_tag': _tagController.text.trim().isEmpty ? null : _tagController.text.trim(),
+        'physical_tag': _tagController.text.trim().isEmpty
+            ? null
+            : _tagController.text.trim(),
         'breed_id': _selectedBreedId,
         'sex': _selectedSex,
         'origin': _selectedOrigin,
@@ -62,7 +66,9 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
         'purchase_price_cfa': double.tryParse(_priceController.text),
         'body_condition': 'normal',
         'status': 'active',
-        'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        'notes': _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
       };
 
       await ref.read(animalActionsServiceProvider).createAnimal(payload);
@@ -77,7 +83,10 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur : $e'), backgroundColor: AppColors.danger),
+          SnackBar(
+            content: Text('Erreur : $e'),
+            backgroundColor: AppColors.danger,
+          ),
         );
       }
     } finally {
@@ -91,9 +100,7 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
     final sectorsAsync = ref.watch(sectorsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Enregistrer un Ovin'),
-      ),
+      appBar: AppBar(title: const Text('Enregistrer un Ovin')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -106,16 +113,24 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Identification', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Identification',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _idController,
                       decoration: const InputDecoration(
                         labelText: 'Identifiant interne unique *',
                         hintText: 'ex: NK-2026-02 ou LDM-01',
-                        prefixIcon: Icon(Icons.badge_outlined),
+                        prefixIcon: Icon(LucideIcons.badgeCheck),
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Identifiant obligatoire' : null,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Identifiant obligatoire'
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -123,9 +138,14 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Nom de l\'animal *',
                         hintText: 'ex: Ndeye Khady, Gorgui...',
-                        prefixIcon: Icon(Icons.pets),
+                        prefixIcon: Padding(
+                          padding: EdgeInsets.all(13),
+                          child: SheepHoofIcon(size: 20),
+                        ),
                       ),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Nom obligatoire' : null,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Nom obligatoire'
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -133,7 +153,7 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Numéro de boucle / tag physique',
                         hintText: 'ex: SN-DKR-045',
-                        prefixIcon: Icon(Icons.tag),
+                        prefixIcon: Icon(LucideIcons.tag),
                       ),
                     ),
                   ],
@@ -149,7 +169,13 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Race & Sexe', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Race & Sexe',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     breedsAsync.when(
                       data: (breeds) {
@@ -157,7 +183,7 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                           value: _selectedBreedId,
                           decoration: const InputDecoration(
                             labelText: 'Race ovine *',
-                            prefixIcon: Icon(Icons.category_outlined),
+                            prefixIcon: Icon(LucideIcons.folders),
                           ),
                           items: breeds.map((b) {
                             return DropdownMenuItem<int>(
@@ -165,7 +191,8 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                               child: Text(b.name),
                             );
                           }).toList(),
-                          onChanged: (val) => setState(() => _selectedBreedId = val),
+                          onChanged: (val) =>
+                              setState(() => _selectedBreedId = val),
                         );
                       },
                       loading: () => const LinearProgressIndicator(),
@@ -176,13 +203,20 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                       value: _selectedSex,
                       decoration: const InputDecoration(
                         labelText: 'Sexe *',
-                        prefixIcon: Icon(Icons.wc),
+                        prefixIcon: Icon(LucideIcons.venusAndMars),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'female', child: Text('Femelle (Brebis)')),
-                        DropdownMenuItem(value: 'male', child: Text('Mâle (Bélier)')),
+                        DropdownMenuItem(
+                          value: 'female',
+                          child: Text('Femelle (Brebis)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'male',
+                          child: Text('Mâle (Bélier)'),
+                        ),
                       ],
-                      onChanged: (val) => setState(() => _selectedSex = val ?? 'female'),
+                      onChanged: (val) =>
+                          setState(() => _selectedSex = val ?? 'female'),
                     ),
                   ],
                 ),
@@ -197,7 +231,13 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Enclos & Mensurations initiales', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Enclos & Mensurations initiales',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     sectorsAsync.when(
                       data: (sectors) {
@@ -205,15 +245,19 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                           value: _selectedSectorId,
                           decoration: const InputDecoration(
                             labelText: 'Enclos / Secteur initial',
-                            prefixIcon: Icon(Icons.meeting_room_outlined),
+                            prefixIcon: Icon(LucideIcons.doorOpen),
                           ),
                           items: sectors.map((s) {
                             return DropdownMenuItem<int>(
                               value: s.id,
-                              child: Text('${s.name} (Capacité: ${s.estimatedCapacity})'),
+                              child: Text(
+                                '${s.name} (Cap. ${s.estimatedCapacity})',
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             );
                           }).toList(),
-                          onChanged: (val) => setState(() => _selectedSectorId = val),
+                          onChanged: (val) =>
+                              setState(() => _selectedSectorId = val),
                         );
                       },
                       loading: () => const LinearProgressIndicator(),
@@ -222,12 +266,14 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _weightController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'Poids actuel (kg)',
                         hintText: 'ex: 65.5',
                         suffixText: 'kg',
-                        prefixIcon: Icon(Icons.scale),
+                        prefixIcon: Icon(LucideIcons.scale),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -238,7 +284,7 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                         labelText: 'Prix d\'achat (FCFA)',
                         hintText: 'ex: 1500000',
                         suffixText: 'FCFA',
-                        prefixIcon: Icon(Icons.payments_outlined),
+                        prefixIcon: Icon(LucideIcons.banknote),
                       ),
                     ),
                   ],
@@ -254,8 +300,18 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isSubmitting
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('Enregistrer l\'ovin', style: TextStyle(fontSize: 16)),
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Enregistrer l\'ovin',
+                      style: TextStyle(fontSize: 16),
+                    ),
             ),
           ],
         ),
