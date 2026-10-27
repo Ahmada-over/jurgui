@@ -124,6 +124,7 @@ class Animal {
   final String reproductionStatus;
   final String? motherId;
   final String? fatherId;
+  final String? lineage;
   final String? notes;
   final Breed? breed;
   final Sector? currentSector;
@@ -149,6 +150,7 @@ class Animal {
     required this.reproductionStatus,
     this.motherId,
     this.fatherId,
+    this.lineage,
     this.notes,
     this.breed,
     this.currentSector,
@@ -184,6 +186,8 @@ class Animal {
     bool clearMotherId = false,
     String? fatherId,
     bool clearFatherId = false,
+    String? lineage,
+    bool clearLineage = false,
     String? notes,
     bool clearNotes = false,
     Breed? breed,
@@ -211,6 +215,7 @@ class Animal {
       reproductionStatus: reproductionStatus ?? this.reproductionStatus,
       motherId: clearMotherId ? null : (motherId ?? this.motherId),
       fatherId: clearFatherId ? null : (fatherId ?? this.fatherId),
+      lineage: clearLineage ? null : (lineage ?? this.lineage),
       notes: clearNotes ? null : (notes ?? this.notes),
       breed: breed ?? this.breed,
       currentSector: currentSector ?? this.currentSector,
@@ -239,6 +244,7 @@ class Animal {
       reproductionStatus: json['reproduction_status'] as String? ?? 'not_pregnant',
       motherId: json['mother_id'] as String?,
       fatherId: json['father_id'] as String?,
+      lineage: json['lineage'] as String?,
       notes: json['notes'] as String?,
       breed: json['breed'] != null ? Breed.fromJson(json['breed'] as Map<String, dynamic>) : null,
       currentSector: json['current_sector'] != null ? Sector.fromJson(json['current_sector'] as Map<String, dynamic>) : null,
@@ -248,6 +254,67 @@ class Animal {
           [],
       movements: (json['movements'] as List<dynamic>?)
               ?.map((m) => AnimalMovement.fromJson(m as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
+}
+
+class AnimalParentSummary {
+  final String id;
+  final String name;
+  final String sex;
+  final String? lineage;
+  final Breed? breed;
+
+  AnimalParentSummary({
+    required this.id,
+    required this.name,
+    required this.sex,
+    this.lineage,
+    this.breed,
+  });
+
+  factory AnimalParentSummary.fromJson(Map<String, dynamic> json) {
+    return AnimalParentSummary(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      sex: json['sex'] as String,
+      lineage: json['lineage'] as String?,
+      breed: json['breed'] != null
+          ? Breed.fromJson(json['breed'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+class AnimalGenealogy {
+  final Animal animal;
+  final AnimalParentSummary? mother;
+  final AnimalParentSummary? father;
+  final List<AnimalParentSummary> offspring;
+
+  AnimalGenealogy({
+    required this.animal,
+    this.mother,
+    this.father,
+    this.offspring = const [],
+  });
+
+  factory AnimalGenealogy.fromJson(Map<String, dynamic> json) {
+    return AnimalGenealogy(
+      animal: Animal.fromJson(json['animal'] as Map<String, dynamic>),
+      mother: json['mother'] != null
+          ? AnimalParentSummary.fromJson(json['mother'] as Map<String, dynamic>)
+          : null,
+      father: json['father'] != null
+          ? AnimalParentSummary.fromJson(json['father'] as Map<String, dynamic>)
+          : null,
+      offspring: (json['offspring'] as List<dynamic>?)
+              ?.map(
+                (o) =>
+                    AnimalParentSummary.fromJson(o as Map<String, dynamic>),
+              )
               .toList() ??
           [],
     );

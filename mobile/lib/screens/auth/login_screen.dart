@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/constants/colors.dart';
+import '../../core/widgets/legal_documents_sheet.dart';
 import '../../core/widgets/sheep_hoof_icon.dart';
 import '../../providers/auth_provider.dart';
 
@@ -197,13 +198,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         'Pas encore de compte ?',
                         style: TextStyle(color: AppColors.textSecondary),
                       ),
-                      TextButton(
+                        TextButton(
                         onPressed: () => context.go('/register'),
                         child: const Text(
                           'Créer un compte',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 12,
+                    runSpacing: 4,
+                    children: [
+                      TextButton(
+                        onPressed: () =>
+                            showLegalDocumentSheet(context, LegalDocType.terms),
+                        child: const Text(
+                          'Conditions d\'utilisation',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => showLegalDocumentSheet(
+                          context,
+                          LegalDocType.privacy,
+                        ),
+                        child: const Text(
+                          'Politique de confidentialité',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            decoration: TextDecoration.underline,
                           ),
                         ),
                       ),

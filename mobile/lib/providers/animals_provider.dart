@@ -114,6 +114,13 @@ final animalDetailProvider = FutureProvider.family<Animal, String>((ref, animalI
   return Animal.fromJson(res.data as Map<String, dynamic>);
 });
 
+final animalGenealogyProvider =
+    FutureProvider.family<AnimalGenealogy, String>((ref, animalId) async {
+  final api = ApiClient();
+  final res = await api.dio.get('${ApiEndpoints.animals}/$animalId/genealogy');
+  return AnimalGenealogy.fromJson(res.data as Map<String, dynamic>);
+});
+
 class AnimalActionsService {
   final ApiClient _api = ApiClient();
 

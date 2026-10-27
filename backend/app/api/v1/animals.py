@@ -58,6 +58,7 @@ async def list_animals(
                 Animal.id.ilike(search_term),
                 Animal.name.ilike(search_term),
                 Animal.physical_tag.ilike(search_term),
+                Animal.lineage.ilike(search_term),
             )
         )
     
@@ -118,6 +119,7 @@ async def create_animal(
         reproduction_status=animal_in.reproduction_status,
         mother_id=animal_in.mother_id,
         father_id=animal_in.father_id,
+        lineage=animal_in.lineage.strip() if animal_in.lineage else None,
         notes=animal_in.notes
     )
     db.add(new_animal)
@@ -337,3 +339,43 @@ async def get_animal_genealogy(
         father=father_out,
         offspring=offspring_out
     )
+
+
+@router.get("/{animal_id}/public-pedigree", response_model=AnimalGenealogyOut)
+async def get_public_animal_pedigree(
+    animal_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Fiche publique de lignée & pedigree partageable entre éleveurs."""
+    query = (
+        select(Animal)
+        .options(
+            selectinload(Animal.breed),
+            selectinload(Animal.current_sector),
+            selectinload(Animal.mother).selectinload(Animal.breed),
+            selectinload(Animal.father).selectinload(Animal.breed),
+        )
+        .where(Animal.id == animal_id)
+    )
+    result = await db.execute(query)
+    animal = result.scalars().first()
+    if not animal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Animal introuvable",
+        )
+
+    offspring_res = await db.execute(
+        select(Animal)
+        .options(selectinload(Animal.breed))
+        .where(or_(Animal.mother_id == animal.id, Animal.father_id == animal.id))
+    )
+    offspring_list = offspring_res.scalars().all()
+
+    return AnimalGenealogyOut(
+        animal=AnimalOut.model_validate(animal),
+        mother=AnimalParentOut.model_validate(animal.mother) if animal.mother else None,
+        father=AnimalParentOut.model_validate(animal.father) if animal.father else None,
+        offspring=[AnimalParentOut.model_validate(o) for o in offspring_list],
+    )
+

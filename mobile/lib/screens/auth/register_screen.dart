@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/constants/colors.dart';
+import '../../core/widgets/legal_documents_sheet.dart';
 import '../../core/widgets/sheep_hoof_icon.dart';
 import '../../providers/auth_provider.dart';
 
@@ -22,6 +23,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _selectedRole = 'admin';
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _acceptedTerms = false;
 
   @override
   void dispose() {
@@ -52,6 +54,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     if (password != confirmPassword) {
       _showError('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    if (!_acceptedTerms) {
+      _showError(
+        'Veuillez accepter les Conditions d\'Utilisation et la Politique de Confidentialité',
+      );
       return;
     }
 
@@ -261,7 +270,76 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 16),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Checkbox(
+                                value: _acceptedTerms,
+                                activeColor: AppColors.primary,
+                                onChanged: (val) => setState(
+                                  () => _acceptedTerms = val ?? false,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  const Text(
+                                    'J\'accepte les ',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () => showLegalDocumentSheet(
+                                      context,
+                                      LegalDocType.terms,
+                                    ),
+                                    child: const Text(
+                                      'Conditions d\'Utilisation',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                  const Text(
+                                    ' et la ',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () => showLegalDocumentSheet(
+                                      context,
+                                      LegalDocType.privacy,
+                                    ),
+                                    child: const Text(
+                                      'Politique de Confidentialité',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
                         SizedBox(
                           height: 52,
                           child: ElevatedButton(

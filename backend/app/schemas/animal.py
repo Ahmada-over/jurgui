@@ -84,6 +84,7 @@ class AnimalBase(BaseModel):
     reproduction_status: str = "not_pregnant"
     mother_id: Optional[str] = None
     father_id: Optional[str] = None
+    lineage: Optional[str] = None
     notes: Optional[str] = None
 
     @field_validator("id")
@@ -124,6 +125,7 @@ class AnimalUpdate(BaseModel):
     reproduction_status: Optional[str] = None
     mother_id: Optional[str] = None
     father_id: Optional[str] = None
+    lineage: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -140,6 +142,7 @@ class AnimalParentOut(BaseModel):
     id: str
     name: str
     sex: str
+    lineage: Optional[str] = None
     breed: Optional[BreedOut] = None
 
     model_config = ConfigDict(from_attributes=True)

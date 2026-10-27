@@ -22,6 +22,9 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
   final _idController = TextEditingController();
   final _nameController = TextEditingController();
   final _tagController = TextEditingController();
+  final _lineageController = TextEditingController();
+  final _fatherIdController = TextEditingController();
+  final _motherIdController = TextEditingController();
   final _weightController = TextEditingController();
   final _priceController = TextEditingController();
   final _notesController = TextEditingController();
@@ -74,6 +77,9 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
     _idController.dispose();
     _nameController.dispose();
     _tagController.dispose();
+    _lineageController.dispose();
+    _fatherIdController.dispose();
+    _motherIdController.dispose();
     _weightController.dispose();
     _priceController.dispose();
     _notesController.dispose();
@@ -114,6 +120,15 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
         ),
         'body_condition': 'normal',
         'status': 'active',
+        'lineage': _lineageController.text.trim().isEmpty
+            ? null
+            : _lineageController.text.trim(),
+        'father_id': _fatherIdController.text.trim().isEmpty
+            ? null
+            : _fatherIdController.text.trim(),
+        'mother_id': _motherIdController.text.trim().isEmpty
+            ? null
+            : _motherIdController.text.trim(),
         'notes': _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
@@ -274,6 +289,41 @@ class _AddAnimalScreenState extends ConsumerState<AddAnimalScreen> {
                         hintText: 'ex: SN-DKR-045',
                         prefixIcon: Icon(LucideIcons.tag),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _lineageController,
+                      decoration: const InputDecoration(
+                        labelText: 'Lignée / Sang (Pedigree)',
+                        hintText: 'ex: Lignée Serigne, Lignée Nabou Jr...',
+                        prefixIcon: Icon(LucideIcons.dna),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _fatherIdController,
+                            decoration: const InputDecoration(
+                              labelText: 'ID Père (Bélier)',
+                              hintText: 'ex: LDM-01',
+                              prefixIcon: Icon(LucideIcons.mars),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _motherIdController,
+                            decoration: const InputDecoration(
+                              labelText: 'ID Mère (Brebis)',
+                              hintText: 'ex: LDM-02',
+                              prefixIcon: Icon(LucideIcons.venus),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

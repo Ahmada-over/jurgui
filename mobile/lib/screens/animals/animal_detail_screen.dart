@@ -1,8 +1,10 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api/api_endpoints.dart';
 import '../../core/constants/colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/animal_photo_avatar.dart';
@@ -402,6 +404,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
     );
     final fatherController = TextEditingController(text: animal.fatherId ?? '');
     final motherController = TextEditingController(text: animal.motherId ?? '');
+    final lineageController = TextEditingController(text: animal.lineage ?? '');
     final notesController = TextEditingController(text: animal.notes ?? '');
 
     int selectedBreedId = animal.breedId;
@@ -864,6 +867,14 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
+                        TextField(
+                          controller: lineageController,
+                          decoration: const InputDecoration(
+                            labelText: 'Lignée / Sang (ex: Lignée Serigne)',
+                            prefixIcon: Icon(LucideIcons.dna),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         Row(
                           children: [
                             Expanded(
@@ -943,6 +954,10 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                                           motherController.text.trim().isEmpty
                                           ? null
                                           : motherController.text.trim(),
+                                      'lineage':
+                                          lineageController.text.trim().isEmpty
+                                          ? null
+                                          : lineageController.text.trim(),
                                       'notes':
                                           notesController.text.trim().isEmpty
                                           ? null
@@ -958,6 +973,9 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                                     _applyOptimisticAnimal(merged);
                                     ref.invalidate(
                                       animalDetailProvider(animal.id),
+                                    );
+                                    ref.invalidate(
+                                      animalGenealogyProvider(animal.id),
                                     );
                                     if (ctx.mounted) Navigator.pop(ctx);
                                     if (mounted) {
@@ -1036,17 +1054,24 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
           ),
         ),
         actions: [
-          if (activeAnimal != null)
+          if (activeAnimal != null) ...[
+            IconButton(
+              icon: const Icon(LucideIcons.share2, color: Colors.white),
+              tooltip: 'Partager la lignée aux éleveurs',
+              onPressed: () => _showSharePedigreeSheet(activeAnimal),
+            ),
             IconButton(
               icon: const Icon(LucideIcons.pencil, color: Colors.white),
               tooltip: 'Modifier la fiche',
               onPressed: () => _showEditAnimalSheet(activeAnimal),
             ),
+          ],
           IconButton(
             icon: const Icon(LucideIcons.refreshCw, color: Colors.white),
             onPressed: () {
               setState(() => _optimisticAnimal = null);
               ref.invalidate(animalDetailProvider(widget.animalId));
+              ref.invalidate(animalGenealogyProvider(widget.animalId));
             },
           ),
         ],
@@ -1292,6 +1317,12 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                           label: animal.isFemale ? 'Brebis' : 'Bélier',
                           isChampagne: false,
                         ),
+                        if (animal.lineage != null &&
+                            animal.lineage!.trim().isNotEmpty)
+                          _buildIdentityTag(
+                            label: 'Lignée : ${animal.lineage}',
+                            isChampagne: true,
+                          ),
                       ],
                     ),
                   ],
@@ -1719,7 +1750,404 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
   }
 
   // --- PEDIGREE & LINEAGE CARD ---
+  String _buildPublicPedigreeUrl(String animalId) {
+    final base = ApiEndpoints.baseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
+    return '$base/pedigree/${Uri.encodeComponent(animalId)}';
+  }
+
+  String _buildPedigreeShareText(Animal animal, AnimalGenealogy? genealogy) {
+    final breedName = animal.breed?.name ?? 'Race Ovine';
+    final sexLabel = animal.isFemale ? 'Brebis (Femelle)' : 'Bélier (Mâle)';
+    final lineageLabel =
+        (animal.lineage != null && animal.lineage!.trim().isNotEmpty)
+        ? animal.lineage!
+        : 'Lignée sélectionnée Jur-gui';
+    final fatherLabel = genealogy?.father != null
+        ? '${genealogy!.father!.name} (${genealogy.father!.id})'
+        : (animal.fatherId != null && animal.fatherId!.isNotEmpty
+              ? animal.fatherId!
+              : 'Non répertorié');
+    final motherLabel = genealogy?.mother != null
+        ? '${genealogy!.mother!.name} (${genealogy.mother!.id})'
+        : (animal.motherId != null && animal.motherId!.isNotEmpty
+              ? animal.motherId!
+              : 'Non répertoriée');
+    final weightLabel = animal.currentWeightKg != null
+        ? '${animal.currentWeightKg!.toStringAsFixed(1)} kg'
+        : 'Non pesé';
+    final tagLabel =
+        animal.physicalTag != null && animal.physicalTag!.isNotEmpty
+        ? '${animal.physicalTag} (ID: ${animal.id})'
+        : animal.id;
+    final publicUrl = _buildPublicPedigreeUrl(animal.id);
+
+    final buffer = StringBuffer()
+      ..writeln('🐏 CERTIFICAT DE LIGNÉE & PEDIGREE — JUR-GUI DAKAR')
+      ..writeln('━━━━━━━━━━━━━━━━━━━━━━')
+      ..writeln('• Nom : ${animal.name}')
+      ..writeln('• Race : $breedName ($sexLabel)')
+      ..writeln('• Lignée / Sang : $lineageLabel')
+      ..writeln('• Boucle / ID : $tagLabel')
+      ..writeln('• Poids : $weightLabel')
+      ..writeln('• Père (Bélier) : $fatherLabel')
+      ..writeln('• Mère (Brebis) : $motherLabel');
+
+    if (genealogy != null && genealogy.offspring.isNotEmpty) {
+      final kids = genealogy.offspring
+          .map((o) => '${o.name} (${o.id})')
+          .join(', ');
+      buffer.writeln(
+        '• Descendance (${genealogy.offspring.length}) : $kids',
+      );
+    }
+
+    buffer
+      ..writeln('━━━━━━━━━━━━━━━━━━━━━━')
+      ..writeln('🔗 Certificat en ligne : $publicUrl');
+
+    return buffer.toString();
+  }
+
+  void _showSharePedigreeSheet(Animal animal) {
+    final genealogy = ref.read(animalGenealogyProvider(animal.id)).value;
+    final breedName = animal.breed?.name ?? 'Race Ovine';
+    final lineageLabel =
+        (animal.lineage != null && animal.lineage!.trim().isNotEmpty)
+        ? animal.lineage!
+        : 'Non renseignée';
+    final fatherLabel = genealogy?.father != null
+        ? '${genealogy!.father!.name} (${genealogy.father!.id})'
+        : (animal.fatherId != null && animal.fatherId!.isNotEmpty
+              ? animal.fatherId!
+              : 'Non répertorié');
+    final motherLabel = genealogy?.mother != null
+        ? '${genealogy!.mother!.name} (${genealogy.mother!.id})'
+        : (animal.motherId != null && animal.motherId!.isNotEmpty
+              ? animal.motherId!
+              : 'Non répertoriée');
+    final shareText = _buildPedigreeShareText(animal, genealogy);
+    final publicUrl = _buildPublicPedigreeUrl(animal.id);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: AppColors.floatingShadow,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.goldLight,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      LucideIcons.award,
+                      color: AppColors.goldDark,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Partager aux autres éleveurs',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Certificat de lignée, parents et descendance',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(LucideIcons.x, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Carte visuelle Certificat Prestige
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: AppColors.heroGradient,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.7),
+                    width: 1.5,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.gold.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: const Text(
+                            'CERTIFICAT DE LIGNÉE • JUR-GUI',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.gold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          LucideIcons.dna,
+                          color: AppColors.gold,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      animal.name,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      '$breedName • ${animal.isFemale ? "Brebis" : "Bélier"} • ID: ${animal.id}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(12),
+                        border: const Border(
+                          left: BorderSide(color: AppColors.gold, width: 3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'LIGNÉE / SANG',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.gold,
+                              letterSpacing: 0.7,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            lineageLabel,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Père (Bélier)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF93C5FD),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  fatherLabel,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Mère (Brebis)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFFF9A8D4),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  motherLabel,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Bouton Copier Fiche complète (WhatsApp / SMS)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(LucideIcons.copy, size: 18),
+                label: const Text(
+                  'Copier le certificat complet (WhatsApp / SMS)',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: shareText));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Certificat de lignée copié ! Prêt à coller aux éleveurs.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // Bouton Copier Lien public
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.divider),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(LucideIcons.link, size: 18),
+                label: const Text(
+                  'Copier le lien web du pedigree public',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                ),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: publicUrl));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Lien copié : $publicUrl'),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPedigreeLineageCard(Animal animal) {
+    final genealogyAsync = ref.watch(animalGenealogyProvider(animal.id));
+    final genealogy = genealogyAsync.value;
+    final hasLineage =
+        animal.lineage != null && animal.lineage!.trim().isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -1745,17 +2173,123 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
-                'Généalogie & Ascendance',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+              const Expanded(
+                child: Text(
+                  'Lignée, Généalogie & Partage',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => _showSharePedigreeSheet(animal),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.goldLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        LucideIcons.share2,
+                        size: 14,
+                        color: AppColors.goldDark,
+                      ),
+                      SizedBox(width: 5),
+                      Text(
+                        'Partager',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.goldDark,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
+
+          // Bandeau Lignée / Sang
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: hasLineage
+                  ? AppColors.goldLight.withValues(alpha: 0.55)
+                  : AppColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: hasLineage
+                    ? AppColors.gold.withValues(alpha: 0.45)
+                    : AppColors.divider,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  LucideIcons.dna,
+                  size: 18,
+                  color: hasLineage
+                      ? AppColors.goldDark
+                      : AppColors.textSecondary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Lignée / Famille génétique',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasLineage
+                            ? animal.lineage!
+                            : 'Aucune lignée renseignée (cliquer sur Modifier)',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: hasLineage
+                              ? AppColors.textPrimary
+                              : AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Modifier la lignée',
+                  icon: const Icon(
+                    LucideIcons.pencil,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                  onPressed: () => _showEditAnimalSheet(animal),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
 
           Row(
             children: [
@@ -1764,6 +2298,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                 child: _buildParentCard(
                   role: 'Père (Bélier)',
                   parentId: animal.fatherId,
+                  parentName: genealogy?.father?.name,
                   icon: LucideIcons.mars,
                   color: const Color(0xFF1D4ED8),
                 ),
@@ -1774,12 +2309,68 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
                 child: _buildParentCard(
                   role: 'Mère (Brebis)',
                   parentId: animal.motherId,
+                  parentName: genealogy?.mother?.name,
                   icon: LucideIcons.venus,
                   color: const Color(0xFFBE185D),
                 ),
               ),
             ],
           ),
+
+          // Descendance (Offspring)
+          if (genealogy != null && genealogy.offspring.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Descendance enregistrée (${genealogy.offspring.length})',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: genealogy.offspring.map((child) {
+                return InkWell(
+                  onTap: () => context.push('/animals/${child.id}'),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          child.sex == 'female'
+                              ? LucideIcons.venus
+                              : LucideIcons.mars,
+                          size: 13,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${child.name} (${child.id})',
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
     );
@@ -1788,10 +2379,16 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
   Widget _buildParentCard({
     required String role,
     required String? parentId,
+    String? parentName,
     required IconData icon,
     required Color color,
   }) {
     final hasParent = parentId != null && parentId.isNotEmpty;
+    final displayTitle = hasParent
+        ? (parentName != null && parentName.isNotEmpty
+              ? '$parentName ($parentId)'
+              : parentId)
+        : 'Non répertorié';
 
     return InkWell(
       onTap: hasParent ? () => context.push('/animals/$parentId') : null,
@@ -1825,7 +2422,7 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              hasParent ? parentId : 'Non répertorié',
+              displayTitle,
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,

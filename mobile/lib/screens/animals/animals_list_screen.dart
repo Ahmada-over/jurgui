@@ -420,6 +420,40 @@ class AnimalsListScreen extends ConsumerWidget {
                               ),
                             ),
                           ),
+                          if (animal.lineage != null &&
+                              animal.lineage!.trim().isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.goldLight,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppColors.gold.withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    LucideIcons.dna,
+                                    size: 13,
+                                    color: AppColors.goldDark,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    animal.lineage!,
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.goldDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           Text(
                             sectorName,
                             style: const TextStyle(

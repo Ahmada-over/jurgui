@@ -32,6 +32,7 @@ class Animal(Base):
     
     mother_id = Column(String(50), ForeignKey("animals.id"), nullable=True)
     father_id = Column(String(50), ForeignKey("animals.id"), nullable=True)
+    lineage = Column(String(120), index=True, nullable=True)  # Lignée / Famille (ex: Lignée Serigne, Nabou Jr, etc.)
     
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
