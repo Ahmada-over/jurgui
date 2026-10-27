@@ -73,7 +73,7 @@ async def get_dashboard_overview(
 
     upcoming_births_res = await db.execute(
         select(Pregnancy)
-        .where(Pregnancy.status == "in_progress", Pregnancy.expected_birth_date <= in_30_days)
+        .where(Pregnancy.status == "in_progress")
         .order_by(Pregnancy.expected_birth_date.asc())
     )
     upcoming_births = [

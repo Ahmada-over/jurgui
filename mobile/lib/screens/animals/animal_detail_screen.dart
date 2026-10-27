@@ -1755,76 +1755,164 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
     return '$base/pedigree/${Uri.encodeComponent(animalId)}';
   }
 
+  String _formatAgeDetail(Animal animal) {
+    if (animal.birthDate != null) {
+      final months =
+          DateTime.now().difference(animal.birthDate!).inDays ~/ 30;
+      if (months >= 12) {
+        final years = months ~/ 12;
+        final rem = months % 12;
+        return '$years an${years > 1 ? "s" : ""}${rem > 0 ? " $rem mois" : ""}';
+      }
+      return '$months mois';
+    }
+    if (animal.estimatedAgeMonths != null) {
+      return '${animal.estimatedAgeMonths} mois (est.)';
+    }
+    return 'Non précisé';
+  }
+
   String _buildPedigreeShareText(Animal animal, AnimalGenealogy? genealogy) {
-    final breedName = animal.breed?.name ?? 'Race Ovine';
-    final sexLabel = animal.isFemale ? 'Brebis (Femelle)' : 'Bélier (Mâle)';
+    final breedName = animal.breed?.name ?? 'Race Ovine Sélectionnée';
+    final sexLabel = animal.isFemale
+        ? 'Brebis (Femelle)'
+        : 'Bélier Géniteur (Mâle)';
     final lineageLabel =
         (animal.lineage != null && animal.lineage!.trim().isNotEmpty)
         ? animal.lineage!
-        : 'Lignée sélectionnée Jur-gui';
+        : 'Lignée Sélectionnée — Registre Jur-gui';
     final fatherLabel = genealogy?.father != null
-        ? '${genealogy!.father!.name} (${genealogy.father!.id})'
+        ? '${genealogy!.father!.name} (ID: ${genealogy.father!.id})'
         : (animal.fatherId != null && animal.fatherId!.isNotEmpty
-              ? animal.fatherId!
-              : 'Non répertorié');
+              ? 'Réf. ${animal.fatherId!}'
+              : 'Ascendant externe');
     final motherLabel = genealogy?.mother != null
-        ? '${genealogy!.mother!.name} (${genealogy.mother!.id})'
+        ? '${genealogy!.mother!.name} (ID: ${genealogy.mother!.id})'
         : (animal.motherId != null && animal.motherId!.isNotEmpty
-              ? animal.motherId!
-              : 'Non répertoriée');
+              ? 'Réf. ${animal.motherId!}'
+              : 'Ascendante externe');
+    final pgfLabel = genealogy?.paternalGrandfather != null
+        ? '${genealogy!.paternalGrandfather!.name} (${genealogy.paternalGrandfather!.id})'
+        : '—';
+    final pgmLabel = genealogy?.paternalGrandmother != null
+        ? '${genealogy!.paternalGrandmother!.name} (${genealogy.paternalGrandmother!.id})'
+        : '—';
+    final mgfLabel = genealogy?.maternalGrandfather != null
+        ? '${genealogy!.maternalGrandfather!.name} (${genealogy.maternalGrandfather!.id})'
+        : '—';
+    final mgmLabel = genealogy?.maternalGrandmother != null
+        ? '${genealogy!.maternalGrandmother!.name} (${genealogy.maternalGrandmother!.id})'
+        : '—';
     final weightLabel = animal.currentWeightKg != null
         ? '${animal.currentWeightKg!.toStringAsFixed(1)} kg'
-        : 'Non pesé';
+        : 'Non communiqué';
+    final birthLabel = animal.birthDate != null
+        ? '${Formatters.formatDate(animal.birthDate)} (${_formatAgeDetail(animal)})'
+        : _formatAgeDetail(animal);
     final tagLabel =
         animal.physicalTag != null && animal.physicalTag!.isNotEmpty
-        ? '${animal.physicalTag} (ID: ${animal.id})'
-        : animal.id;
+        ? animal.physicalTag!
+        : 'Non bouclé';
+    final originLabel = animal.origin == 'birth'
+        ? 'Né à la bergerie (Sélection interne)'
+        : 'Acquisition externe sélectionnée';
+    final condLabel = Formatters.translateCondition(animal.bodyCondition);
+    final reproLabel = Formatters.translateReproStatus(
+      animal.reproductionStatus,
+    );
+    final certRef =
+        'JG-DKR-${animal.id.toUpperCase()}-${DateTime.now().year}';
     final publicUrl = _buildPublicPedigreeUrl(animal.id);
 
     final buffer = StringBuffer()
-      ..writeln('🐏 CERTIFICAT DE LIGNÉE & PEDIGREE — JUR-GUI DAKAR')
-      ..writeln('━━━━━━━━━━━━━━━━━━━━━━')
-      ..writeln('• Nom : ${animal.name}')
-      ..writeln('• Race : $breedName ($sexLabel)')
-      ..writeln('• Lignée / Sang : $lineageLabel')
-      ..writeln('• Boucle / ID : $tagLabel')
-      ..writeln('• Poids : $weightLabel')
-      ..writeln('• Père (Bélier) : $fatherLabel')
-      ..writeln('• Mère (Brebis) : $motherLabel');
+      ..writeln('══════════════════════════════════')
+      ..writeln('CERTIFICAT OFFICIEL DE LIGNÉE & PEDIGREE')
+      ..writeln('LIVRE GÉNÉALOGIQUE OVIN — JUR-GUI DAKAR')
+      ..writeln('Réf. Certificat : $certRef')
+      ..writeln('══════════════════════════════════')
+      ..writeln('')
+      ..writeln('1. IDENTIFICATION & SIGNALEMENT ZOOTECHNIQUE')
+      ..writeln('• Nom du sujet       : ${animal.name.toUpperCase()}')
+      ..writeln('• N° Registre Interne : ${animal.id}')
+      ..writeln('• Boucle Officielle  : $tagLabel')
+      ..writeln('• Race & Standard    : $breedName')
+      ..writeln('• Sexe               : $sexLabel')
+      ..writeln('• Date de naissance  : $birthLabel')
+      ..writeln('• Origine            : $originLabel')
+      ..writeln('')
+      ..writeln('2. LIGNÉE & ARBRE GÉNÉALOGIQUE (2 GÉNÉRATIONS)')
+      ..writeln('• Lignée / Sang      : $lineageLabel')
+      ..writeln('• Père (Géniteur)    : $fatherLabel')
+      ..writeln('  ├─ Grand-Père Pat. : $pgfLabel')
+      ..writeln('  └─ Grand-Mère Pat. : $pgmLabel')
+      ..writeln('• Mère (Génitrice)   : $motherLabel')
+      ..writeln('  ├─ Grand-Père Mat. : $mgfLabel')
+      ..writeln('  └─ Grand-Mère Mat. : $mgmLabel')
+      ..writeln('')
+      ..writeln('3. PERFORMANCES & CONFORMATION')
+      ..writeln('• Poids certifié     : $weightLabel')
+      ..writeln('• État corporel      : $condLabel')
+      ..writeln('• Statut reproducteur: $reproLabel');
 
     if (genealogy != null && genealogy.offspring.isNotEmpty) {
-      final kids = genealogy.offspring
-          .map((o) => '${o.name} (${o.id})')
-          .join(', ');
-      buffer.writeln(
-        '• Descendance (${genealogy.offspring.length}) : $kids',
-      );
+      buffer
+        ..writeln('')
+        ..writeln(
+          '4. DESCENDANCE ENREGISTRÉE (${genealogy.offspring.length} sujet${genealogy.offspring.length > 1 ? "s" : ""})',
+        );
+      for (final o in genealogy.offspring) {
+        final oSex = o.sex == 'female' ? '♀ Brebis' : '♂ Bélier';
+        buffer.writeln('• ${o.name} (ID: ${o.id}) — $oSex');
+      }
     }
 
     buffer
-      ..writeln('━━━━━━━━━━━━━━━━━━━━━━')
-      ..writeln('🔗 Certificat en ligne : $publicUrl');
+      ..writeln('')
+      ..writeln('══════════════════════════════════')
+      ..writeln('Certificat numérique vérifiable & imprimable (PDF) :')
+      ..writeln(publicUrl);
 
     return buffer.toString();
   }
 
   void _showSharePedigreeSheet(Animal animal) {
     final genealogy = ref.read(animalGenealogyProvider(animal.id)).value;
-    final breedName = animal.breed?.name ?? 'Race Ovine';
+    final breedName = animal.breed?.name ?? 'Race Ovine Sélectionnée';
     final lineageLabel =
         (animal.lineage != null && animal.lineage!.trim().isNotEmpty)
         ? animal.lineage!
-        : 'Non renseignée';
+        : 'Lignée Sélectionnée — Registre Jur-gui';
     final fatherLabel = genealogy?.father != null
         ? '${genealogy!.father!.name} (${genealogy.father!.id})'
         : (animal.fatherId != null && animal.fatherId!.isNotEmpty
-              ? animal.fatherId!
-              : 'Non répertorié');
+              ? 'Réf. ${animal.fatherId!}'
+              : 'Ascendant externe');
     final motherLabel = genealogy?.mother != null
         ? '${genealogy!.mother!.name} (${genealogy.mother!.id})'
         : (animal.motherId != null && animal.motherId!.isNotEmpty
-              ? animal.motherId!
-              : 'Non répertoriée');
+              ? 'Réf. ${animal.motherId!}'
+              : 'Ascendante externe');
+    final pgfLabel = genealogy?.paternalGrandfather != null
+        ? '${genealogy!.paternalGrandfather!.name} (${genealogy.paternalGrandfather!.id})'
+        : 'Non répertorié';
+    final pgmLabel = genealogy?.paternalGrandmother != null
+        ? '${genealogy!.paternalGrandmother!.name} (${genealogy.paternalGrandmother!.id})'
+        : 'Non répertoriée';
+    final mgfLabel = genealogy?.maternalGrandfather != null
+        ? '${genealogy!.maternalGrandfather!.name} (${genealogy.maternalGrandfather!.id})'
+        : 'Non répertorié';
+    final mgmLabel = genealogy?.maternalGrandmother != null
+        ? '${genealogy!.maternalGrandmother!.name} (${genealogy.maternalGrandmother!.id})'
+        : 'Non répertoriée';
+    final weightLabel = animal.currentWeightKg != null
+        ? '${animal.currentWeightKg!.toStringAsFixed(1)} kg'
+        : 'Non pesé';
+    final tagLabel =
+        animal.physicalTag != null && animal.physicalTag!.isNotEmpty
+        ? animal.physicalTag!
+        : 'Non bouclé';
+    final certRef =
+        'JG-DKR-${animal.id.toUpperCase()}-${DateTime.now().year}';
     final shareText = _buildPedigreeShareText(animal, genealogy);
     final publicUrl = _buildPublicPedigreeUrl(animal.id);
 
@@ -1833,311 +1921,523 @@ class _AnimalDetailScreenState extends ConsumerState<AnimalDetailScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.90,
+        ),
+        margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(28),
           boxShadow: AppColors.floatingShadow,
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.divider,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.goldLight,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      LucideIcons.award,
-                      color: AppColors.goldDark,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Partager aux autres éleveurs',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          'Certificat de lignée, parents et descendance',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(LucideIcons.x, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Carte visuelle Certificat Prestige
-              Container(
-                padding: const EdgeInsets.all(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
                 decoration: BoxDecoration(
-                  gradient: AppColors.heroGradient,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: AppColors.gold.withValues(alpha: 0.7),
-                    width: 1.5,
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    LucideIcons.award,
+                    color: AppColors.primary,
+                    size: 22,
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.gold.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: AppColors.gold.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          child: const Text(
-                            'CERTIFICAT DE LIGNÉE • JUR-GUI',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.gold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                        const Icon(
-                          LucideIcons.dna,
-                          color: AppColors.gold,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      animal.name,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      '$breedName • ${animal.isFemale ? "Brebis" : "Bélier"} • ID: ${animal.id}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(12),
-                        border: const Border(
-                          left: BorderSide(color: AppColors.gold, width: 3),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dossier Généalogique & Pedigree',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'LIGNÉE / SANG',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.gold,
-                              letterSpacing: 0.7,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            lineageLabel,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'Fiche officielle de lignée pour éleveurs & acheteurs',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x, size: 20),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Aperçu du Certificat Officiel (Scrollable)
+            Flexible(
+              child: SingleChildScrollView(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFCFCFA),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.gold,
+                      width: 1.8,
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    boxShadow: AppColors.softShadow,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // En-tête Institutionnel Vert Forêt & Or
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: const BoxDecoration(
+                          gradient: AppColors.heroGradient,
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(18),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text(
-                                  'Père (Bélier)',
+                                  'LIVRE GÉNÉALOGIQUE OVIN • DAKAR',
                                   style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF93C5FD),
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.gold,
+                                    letterSpacing: 0.9,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  fatherLabel,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.28),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: AppColors.gold.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    certRef,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(height: 12),
+                            Row(
                               children: [
-                                const Text(
-                                  'Mère (Brebis)',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFFF9A8D4),
-                                    fontWeight: FontWeight.w700,
+                                Container(
+                                  padding: const EdgeInsets.all(2.5),
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: AppColors.goldGradient,
+                                  ),
+                                  child: AnimalPhotoImage(
+                                    photoUrl: animal.photoUrl,
+                                    size: 58,
+                                    fallback: CircleAvatar(
+                                      radius: 29,
+                                      backgroundColor: AppColors.primary,
+                                      child: Text(
+                                        animal.name.isNotEmpty
+                                            ? animal.name[0].toUpperCase()
+                                            : 'O',
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  motherLabel,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        animal.name.toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        '$breedName • ${animal.isFemale ? "♀ Brebis" : "♂ Bélier Géniteur"}',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white.withValues(
+                                            alpha: 0.85,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
+                          ],
+                        ),
+                      ),
+
+                      // Bandeau Lignée Or
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: AppColors.goldLight,
+                          border: Border(
+                            bottom: BorderSide(color: Color(0xFFE5D59B)),
                           ),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Bouton Copier Fiche complète (WhatsApp / SMS)
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                icon: const Icon(LucideIcons.copy, size: 18),
-                label: const Text(
-                  'Copier le certificat complet (WhatsApp / SMS)',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                ),
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: shareText));
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Certificat de lignée copié ! Prêt à coller aux éleveurs.',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              LucideIcons.dna,
+                              size: 16,
+                              color: AppColors.goldDark,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'LIGNÉE / FAMILLE GÉNÉTIQUE',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.goldDark,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  Text(
+                                    lineageLabel,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 10),
 
-              // Bouton Copier Lien public
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.divider),
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                      // Corps du certificat : Grille Zootechnique + Arbre 2 générations
+                      Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 4 indicateurs clés
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildCertMetricBox(
+                                    'N° REGISTRE',
+                                    animal.id,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildCertMetricBox(
+                                    'BOUCLE',
+                                    tagLabel,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildCertMetricBox(
+                                    'POIDS CERTIFIÉ',
+                                    weightLabel,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildCertMetricBox(
+                                    'ÂGE',
+                                    _formatAgeDetail(animal),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'ASCENDANCE OFFICIELLE (PARENTS & GRANDS-PARENTS)',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textSecondary,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Branche Paternelle (Sire)
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFF),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFF1D4ED8,
+                                  ).withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        LucideIcons.mars,
+                                        size: 14,
+                                        color: Color(0xFF1D4ED8),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text(
+                                        'PÈRE (SIRE) : ',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF1D4ED8),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          fatherLabel,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '├─ GP Paternel : $pgfLabel\n└─ GM Paternelle : $pgmLabel',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppColors.textSecondary,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Branche Maternelle (Dam)
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF8FB),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFFBE185D,
+                                  ).withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        LucideIcons.venus,
+                                        size: 14,
+                                        color: Color(0xFFBE185D),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text(
+                                        'MÈRE (DAM) : ',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFFBE185D),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          motherLabel,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '├─ GP Maternel : $mgfLabel\n└─ GM Maternelle : $mgmLabel',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppColors.textSecondary,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                icon: const Icon(LucideIcons.link, size: 18),
-                label: const Text(
-                  'Copier le lien web du pedigree public',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
-                ),
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: publicUrl));
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Lien copié : $publicUrl'),
-                      ),
-                    );
-                  }
-                },
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 14),
+
+            // Bouton Copier Dossier Officiel Complet
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              icon: const Icon(LucideIcons.fileCheck2, size: 18),
+              label: const Text(
+                'Copier le dossier généalogique officiel',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              ),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: shareText));
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Dossier généalogique officiel copié dans le presse-papiers !',
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+
+            // Bouton Copier Lien Certificat Web / PDF
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.divider),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              icon: const Icon(LucideIcons.globe, size: 18),
+              label: const Text(
+                'Copier le lien du Certificat Web (PDF imprimable)',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+              ),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: publicUrl));
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Lien du certificat copié : $publicUrl'),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCertMetricBox(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

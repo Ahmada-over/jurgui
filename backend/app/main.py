@@ -205,6 +205,8 @@ async def privacy_policy():
 
 @app.get("/pedigree/{animal_id}", response_class=HTMLResponse, tags=["Pedigree Public"])
 async def public_pedigree_page(animal_id: str):
+    from datetime import date
+    from sqlalchemy import or_, func
     from sqlalchemy.orm import selectinload
 
     async with AsyncSessionLocal() as session:
@@ -212,84 +214,759 @@ async def public_pedigree_page(animal_id: str):
             select(Animal)
             .options(
                 selectinload(Animal.breed),
-                selectinload(Animal.mother),
-                selectinload(Animal.father),
+                selectinload(Animal.current_sector),
+                selectinload(Animal.weight_records),
+                selectinload(Animal.mother).selectinload(Animal.breed),
+                selectinload(Animal.mother).selectinload(Animal.father),
+                selectinload(Animal.mother).selectinload(Animal.mother),
+                selectinload(Animal.father).selectinload(Animal.breed),
+                selectinload(Animal.father).selectinload(Animal.father),
+                selectinload(Animal.father).selectinload(Animal.mother),
             )
-            .where(Animal.id == animal_id)
+            .where(func.lower(Animal.id) == animal_id.strip().lower())
         )
         res = await session.execute(query)
         animal = res.scalars().first()
         if not animal:
             return HTMLResponse(
-                content="<h1>Ovin introuvable</h1>",
+                content="""<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Fiche introuvable — Jur-gui</title><style>body{font-family:system-ui,sans-serif;background:#071F18;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;text-align:center}.box{max-width:420px;background:#0D3B2E;border:1px solid rgba(212,175,55,0.4);border-radius:20px;padding:32px}h1{margin:0 0 8px;color:#F3D36B;font-size:22px}p{color:#CBD5E1;font-size:14px}</style></head><body><div class="box"><h1>Certificat Généalogique Introuvable</h1><p>Aucun sujet ovin enregistré sous cette référence dans le registre Jur-gui Dakar.</p></div></body></html>""",
                 status_code=404,
             )
 
-        breed_name = animal.breed.name if animal.breed else "Race Ovine"
-        sex_label = "Brebis (Femelle)" if animal.sex == "female" else "Bélier (Mâle)"
-        lineage_label = animal.lineage or "Lignée certifiée Jur-gui"
-        father_label = (
-            f"{animal.father.name} ({animal.father.id})"
-            if animal.father
-            else (animal.father_id or "Non répertorié")
+        offspring_res = await session.execute(
+            select(Animal)
+            .options(selectinload(Animal.breed))
+            .where(or_(Animal.mother_id == animal.id, Animal.father_id == animal.id))
+            .order_by(Animal.birth_date.desc())
         )
-        mother_label = (
-            f"{animal.mother.name} ({animal.mother.id})"
-            if animal.mother
-            else (animal.mother_id or "Non répertoriée")
+        offspring = offspring_res.scalars().all()
+
+        breed_name = animal.breed.name if animal.breed else "Race Ovine Sélectionnée"
+        is_female = animal.sex.lower() == "female"
+        sex_label = "Brebis (Femelle)" if is_female else "Bélier Géniteur (Mâle)"
+        sex_code = "♀ FEMELLE" if is_female else "♂ MÂLE"
+        lineage_label = animal.lineage or "Lignée Pure Sélectionnée — Registre Jur-gui"
+        tag_label = animal.physical_tag or "Non bouclé"
+        birth_str = animal.birth_date.strftime("%d/%m/%Y") if animal.birth_date else "Non renseignée"
+
+        age_str = "Non précisé"
+        if animal.birth_date:
+            months = max(0, (date.today() - animal.birth_date).days // 30)
+            if months >= 12:
+                years = months // 12
+                rem_m = months % 12
+                age_str = f"{years} an{'s' if years > 1 else ''}" + (f" {rem_m} mois" if rem_m else "")
+            else:
+                age_str = f"{months} mois"
+        elif animal.estimated_age_months:
+            age_str = f"{animal.estimated_age_months} mois (est.)"
+
+        origin_map = {
+            "birth": "Né à la bergerie (Sélection interne)",
+            "purchase": "Acquisition externe sélectionnée",
+            "gift": "Don / Échange génétique",
+        }
+        origin_label = origin_map.get(animal.origin, "Bergerie Jur-gui Dakar")
+
+        cond_map = {
+            "normal": ("État Corporel Optimal (BCS 3.5/5)", "#10B981"),
+            "fat": ("État Corporel Élevé / Concours (BCS 4/5)", "#D4AF37"),
+            "thin": ("En phase de reprise corporelle", "#F59E0B"),
+        }
+        cond_label, cond_color = cond_map.get(animal.body_condition, ("Optimal", "#10B981"))
+
+        repro_map = {
+            "not_pregnant": "Disponible / Actif en reproduction",
+            "suspected": "Saillie déclarée (Gestation présumée)",
+            "confirmed": "Gestation confirmée (Suivi 150 j)",
+            "lactating": "En lactation (Mère allaitante)",
+            "resting": "Repos physiologique",
+        }
+        repro_label = repro_map.get(animal.reproduction_status, "Actif")
+
+        # Weight calculation & history
+        weights_sorted = sorted(animal.weight_records, key=lambda w: w.recorded_at)
+        current_weight_str = (
+            f"{animal.current_weight_kg:.1f} kg" if animal.current_weight_kg else "Non pesé"
         )
-        weight_label = f"{animal.current_weight_kg:.1f} kg" if animal.current_weight_kg else "Non communiqué"
-        tag_label = animal.physical_tag or animal.id
+        initial_weight_str = (
+            f"{weights_sorted[0].weight_kg:.1f} kg" if weights_sorted else current_weight_str
+        )
+        weight_gain_str = "—"
+        if len(weights_sorted) >= 2:
+            diff = weights_sorted[-1].weight_kg - weights_sorted[0].weight_kg
+            sign = "+" if diff >= 0 else ""
+            weight_gain_str = f"{sign}{diff:.1f} kg"
+
+        # Genealogy nodes (3 generations)
+        def fmt_node(obj, fallback_id=None, default_txt="Origine externe non répertoriée"):
+            if obj:
+                b_txt = obj.breed.name if getattr(obj, "breed", None) else breed_name
+                l_txt = f" • Lignée {obj.lineage}" if getattr(obj, "lineage", None) else ""
+                return (
+                    f"<div class='node-name'>{obj.name}</div>"
+                    f"<div class='node-meta'>ID : <strong>{obj.id}</strong> • {b_txt}{l_txt}</div>"
+                )
+            if fallback_id:
+                return (
+                    f"<div class='node-name'>Réf. {fallback_id}</div>"
+                    f"<div class='node-meta'>Ascendant enregistré hors bergerie</div>"
+                )
+            return f"<div class='node-empty'>{default_txt}</div>"
+
+        sire_html = fmt_node(animal.father, animal.father_id, "Géniteur externe / Non renseigné")
+        dam_html = fmt_node(animal.mother, animal.mother_id, "Génitrice externe / Non renseignée")
+
+        paternal_gf = animal.father.father if animal.father else None
+        paternal_gf_id = animal.father.father_id if animal.father else None
+        paternal_gm = animal.father.mother if animal.father else None
+        paternal_gm_id = animal.father.mother_id if animal.father else None
+
+        maternal_gf = animal.mother.father if animal.mother else None
+        maternal_gf_id = animal.mother.father_id if animal.mother else None
+        maternal_gm = animal.mother.mother if animal.mother else None
+        maternal_gm_id = animal.mother.mother_id if animal.mother else None
+
+        pgf_html = fmt_node(paternal_gf, paternal_gf_id, "Grand-père paternel non renseigné")
+        pgm_html = fmt_node(paternal_gm, paternal_gm_id, "Grand-mère paternelle non renseignée")
+        mgf_html = fmt_node(maternal_gf, maternal_gf_id, "Grand-père maternel non renseigné")
+        mgm_html = fmt_node(maternal_gm, maternal_gm_id, "Grand-mère maternelle non renseignée")
+
+        # Photo or Monogram
+        if animal.photo_url and animal.photo_url.strip():
+            avatar_html = f"<img src='{animal.photo_url}' alt='{animal.name}' class='subject-photo' />"
+        else:
+            initial = animal.name[0].upper() if animal.name else "O"
+            avatar_html = f"<div class='subject-monogram'>{initial}</div>"
+
+        # Offspring table
+        if offspring:
+            offspring_rows = "".join(
+                f"<tr>"
+                f"<td><strong>{o.name}</strong></td>"
+                f"<td><span class='mono-tag'>{o.id}</span></td>"
+                f"<td>{'♀ Brebis' if o.sex == 'female' else '♂ Bélier'}</td>"
+                f"<td>{o.breed.name if o.breed else breed_name}</td>"
+                f"<td>{o.birth_date.strftime('%d/%m/%Y') if o.birth_date else '—'}</td>"
+                f"<td>{f'{o.current_weight_kg:.1f} kg' if o.current_weight_kg else '—'}</td>"
+                f"</tr>"
+                for o in offspring
+            )
+            offspring_section = f"""
+            <div class="section">
+              <div class="section-header">
+                <span class="section-num">04</span>
+                <div>
+                  <h2>Descendance Certifiée ({len(offspring)} sujet{'s' if len(offspring) > 1 else ''})</h2>
+                  <p>Produits directs enregistrés dans le livre généalogique de l'exploitation</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Nom du sujet</th>
+                      <th>N° Registre</th>
+                      <th>Sexe</th>
+                      <th>Race</th>
+                      <th>Naissance</th>
+                      <th>Poids</th>
+                    </tr>
+                  </thead>
+                  <tbody>{offspring_rows}</tbody>
+                </table>
+              </div>
+            </div>
+            """
+        else:
+            offspring_section = ""
+
+        # Weight records table
+        if weights_sorted:
+            w_rows = "".join(
+                f"<tr>"
+                f"<td>{w.recorded_at.strftime('%d/%m/%Y')}</td>"
+                f"<td><strong>{w.weight_kg:.1f} kg</strong></td>"
+                f"<td>{w.notes or 'Pesée de contrôle zootechnique'}</td>"
+                f"</tr>"
+                for w in reversed(weights_sorted[-5:])
+            )
+            weights_table_html = f"""
+            <div class="table-wrap" style="margin-top:14px;">
+              <table class="data-table">
+                <thead>
+                  <tr><th>Date du relevé</th><th>Poids mesuré</th><th>Observation zootechnique</th></tr>
+                </thead>
+                <tbody>{w_rows}</tbody>
+              </table>
+            </div>
+            """
+        else:
+            weights_table_html = ""
+
+        issued_date = date.today().strftime("%d/%m/%Y")
+        cert_ref = f"JG-DKR-{animal.id.upper()}-{date.today().year}"
 
         return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Certificat de Lignée — {animal.name} ({animal.id}) | Jur-gui</title>
+  <title>Certificat Officiel de Lignée & Pedigree — {animal.name} ({animal.id}) | Jur-gui Dakar</title>
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #09221A; color: #FFFFFF; margin: 0; padding: 24px 16px; }}
-    .cert {{ max-width: 540px; margin: 0 auto; background: linear-gradient(145deg, #0D3B2E, #071F18); border: 2px solid #D4AF37; border-radius: 28px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.45); }}
-    .badge {{ display: inline-block; background: rgba(212,175,55,0.18); color: #F3D36B; border: 1px solid #D4AF37; padding: 5px 14px; border-radius: 99px; font-size: 12px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; }}
-    h1 {{ font-size: 28px; margin: 14px 0 4px; color: #FFFFFF; }}
-    .sub {{ color: #A7F3D0; font-weight: 600; font-size: 14px; margin-bottom: 18px; }}
-    .lineage-box {{ background: rgba(212,175,55,0.12); border-left: 4px solid #D4AF37; padding: 14px 16px; border-radius: 12px; margin-bottom: 20px; }}
-    .lineage-title {{ font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #F3D36B; font-weight: 700; }}
-    .lineage-val {{ font-size: 18px; font-weight: 800; color: #FFFFFF; margin-top: 2px; }}
-    .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }}
-    .box {{ background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 12px 14px; }}
-    .lbl {{ font-size: 11px; color: #94A3B8; text-transform: uppercase; font-weight: 700; }}
-    .val {{ font-size: 15px; font-weight: 800; color: #FFFFFF; margin-top: 4px; }}
-    .parents {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }}
-    .parent-sire {{ background: rgba(59,130,246,0.12); border: 1px solid rgba(96,165,250,0.35); border-radius: 16px; padding: 14px; }}
-    .parent-dam {{ background: rgba(236,72,153,0.12); border: 1px solid rgba(244,114,182,0.35); border-radius: 16px; padding: 14px; }}
-    .footer {{ text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.12); font-size: 12px; color: #94A3B8; }}
+    :root {{
+      --forest: #0D3B2E;
+      --forest-dark: #071F18;
+      --emerald: #10B981;
+      --gold: #D4AF37;
+      --gold-light: #FBF5E2;
+      --gold-dark: #9A7B1C;
+      --slate-900: #0F172A;
+      --slate-700: #334155;
+      --slate-500: #64748B;
+      --border: #E2E8F0;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #071A14;
+      color: var(--slate-900);
+      margin: 0;
+      padding: 28px 16px 48px;
+      line-height: 1.5;
+    }}
+    .toolbar {{
+      max-width: 880px;
+      margin: 0 auto 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #E2E8F0;
+      font-size: 13px;
+    }}
+    .btn-print {{
+      background: linear-gradient(135deg, #D4AF37, #AA8215);
+      color: #071F18;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 99px;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(212,175,55,0.35);
+    }}
+    .sheet {{
+      max-width: 880px;
+      margin: 0 auto;
+      background: #FFFFFF;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 28px 70px rgba(0,0,0,0.55);
+      border: 2px solid var(--gold);
+    }}
+    /* Header Banner */
+    .cert-header {{
+      background: linear-gradient(135deg, #0D3B2E 0%, #062119 100%);
+      color: #FFFFFF;
+      padding: 32px 36px;
+      border-bottom: 3px solid var(--gold);
+      position: relative;
+    }}
+    .cert-topline {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 22px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }}
+    .brand {{
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }}
+    .brand-seal {{
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: rgba(212,175,55,0.18);
+      border: 1.5px solid var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: #F3D36B;
+      font-size: 16px;
+    }}
+    .brand-title {{
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: #FFFFFF;
+    }}
+    .brand-sub {{
+      font-size: 12px;
+      color: #A7F3D0;
+    }}
+    .cert-ref {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      background: rgba(212,175,55,0.16);
+      color: #F3D36B;
+      border: 1px solid rgba(212,175,55,0.45);
+      padding: 6px 14px;
+      border-radius: 99px;
+      font-weight: 700;
+    }}
+    .hero-subject {{
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }}
+    .subject-photo {{
+      width: 112px;
+      height: 112px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--gold);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      background: #092920;
+    }}
+    .subject-monogram {{
+      width: 112px;
+      height: 112px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #1B5E4B, #092920);
+      border: 3px solid var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 44px;
+      font-weight: 900;
+      color: #F3D36B;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }}
+    .subject-info {{
+      flex: 1;
+      min-width: 240px;
+    }}
+    .doc-kicker {{
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: #F3D36B;
+      font-weight: 800;
+    }}
+    .subject-name {{
+      font-size: 34px;
+      font-weight: 900;
+      margin: 4px 0 8px;
+      letter-spacing: -0.6px;
+      color: #FFFFFF;
+    }}
+    .pills {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }}
+    .pill {{
+      font-size: 12px;
+      font-weight: 800;
+      padding: 5px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.12);
+      color: #FFFFFF;
+    }}
+    .pill-gold {{
+      background: linear-gradient(135deg, #F3D36B, #D4AF37);
+      color: #071F18;
+    }}
+    /* Lineage Highlight Strip */
+    .lineage-strip {{
+      background: var(--gold-light);
+      border-bottom: 1px solid #E5D59B;
+      padding: 18px 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }}
+    .lineage-strip-lbl {{
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gold-dark);
+    }}
+    .lineage-strip-val {{
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--forest-dark);
+    }}
+    /* Body Content */
+    .cert-body {{
+      padding: 32px 36px;
+    }}
+    .section {{
+      margin-bottom: 32px;
+    }}
+    .section:last-child {{
+      margin-bottom: 0;
+    }}
+    .section-header {{
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #F1F5F9;
+    }}
+    .section-num {{
+      background: var(--forest);
+      color: #F3D36B;
+      font-weight: 900;
+      font-size: 12px;
+      padding: 4px 9px;
+      border-radius: 8px;
+      margin-top: 2px;
+    }}
+    .section-header h2 {{
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--forest-dark);
+    }}
+    .section-header p {{
+      margin: 2px 0 0;
+      font-size: 12.5px;
+      color: var(--slate-500);
+    }}
+    /* Spec Grid */
+    .spec-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+      gap: 12px;
+    }}
+    .spec-card {{
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+    }}
+    .spec-lbl {{
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--slate-500);
+    }}
+    .spec-val {{
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--slate-900);
+      margin-top: 4px;
+    }}
+    /* 3-Generation Pedigree Tree */
+    .pedigree-tree {{
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 16px;
+      align-items: stretch;
+    }}
+    @media (max-width: 680px) {{
+      .pedigree-tree {{ grid-template-columns: 1fr; }}
+      .cert-header, .cert-body, .lineage-strip {{ padding-left: 20px; padding-right: 20px; }}
+    }}
+    .gen-col {{
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      gap: 12px;
+    }}
+    .tree-card {{
+      border-radius: 14px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      background: #FFFFFF;
+      position: relative;
+    }}
+    .tree-sire {{
+      border-left: 4px solid #1D4ED8;
+      background: #F8FAFF;
+    }}
+    .tree-dam {{
+      border-left: 4px solid #BE185D;
+      background: #FFF8FB;
+    }}
+    .tree-gp {{
+      padding: 10px 14px;
+      background: #F8FAFC;
+      border-left: 3px solid #94A3B8;
+    }}
+    .role-tag {{
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 4px;
+    }}
+    .role-sire {{ color: #1D4ED8; }}
+    .role-dam {{ color: #BE185D; }}
+    .role-gp {{ color: #475569; }}
+    .node-name {{
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--slate-900);
+    }}
+    .node-meta {{
+      font-size: 12px;
+      color: var(--slate-700);
+      margin-top: 2px;
+    }}
+    .node-empty {{
+      font-size: 13px;
+      font-style: italic;
+      color: var(--slate-500);
+    }}
+    /* Tables */
+    .table-wrap {{
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }}
+    .data-table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      text-align: left;
+    }}
+    .data-table th {{
+      background: #F1F5F9;
+      color: var(--slate-700);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }}
+    .data-table td {{
+      padding: 10px 14px;
+      border-bottom: 1px solid #F1F5F9;
+      color: var(--slate-900);
+    }}
+    .data-table tr:last-child td {{ border-bottom: none; }}
+    .mono-tag {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      background: #E8F5EE;
+      color: var(--forest);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+    }}
+    /* Footer Certification */
+    .cert-footer {{
+      background: #F8FAFC;
+      border-top: 1px solid var(--border);
+      padding: 22px 36px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--slate-500);
+    }}
+    .stamp {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--forest);
+      font-weight: 800;
+      background: #E8F5EE;
+      border: 1px solid #A7F3D0;
+      padding: 6px 14px;
+      border-radius: 99px;
+    }}
+    @media print {{
+      body {{ background: #FFFFFF; padding: 0; }}
+      .toolbar {{ display: none; }}
+      .sheet {{ box-shadow: none; border: 1px solid #000; }}
+    }}
   </style>
 </head>
 <body>
-  <div class="cert">
-    <span class="badge">Certificat Généalogique • Jur-gui Dakar</span>
-    <h1>{animal.name}</h1>
-    <div class="sub">{breed_name} • {sex_label}</div>
-    <div class="lineage-box">
-      <div class="lineage-title">Lignée / Sang</div>
-      <div class="lineage-val">{lineage_label}</div>
-    </div>
-    <div class="grid">
-      <div class="box"><div class="lbl">Identifiant / Boucle</div><div class="val">{tag_label}</div></div>
-      <div class="box"><div class="lbl">Poids enregistré</div><div class="val">{weight_label}</div></div>
-    </div>
-    <div class="parents">
-      <div class="parent-sire">
-        <div class="lbl" style="color:#93C5FD;">Père (Géniteur)</div>
-        <div class="val">{father_label}</div>
+  <div class="toolbar">
+    <span>Registre Numérique d'Élevage Ovin — Jur-gui Dakar</span>
+    <button class="btn-print" onclick="window.print()">Imprimer / Enregistrer en PDF</button>
+  </div>
+
+  <div class="sheet">
+    <!-- EN-TÊTE OFFICIEL -->
+    <div class="cert-header">
+      <div class="cert-topline">
+        <div class="brand">
+          <div class="brand-seal">JG</div>
+          <div>
+            <div class="brand-title">Jur-gui • Livre Généalogique Ovin</div>
+            <div class="brand-sub">Élevage de Sélection — Dakar, Sénégal</div>
+          </div>
+        </div>
+        <div class="cert-ref">RÉF. CERTIFICAT : {cert_ref}</div>
       </div>
-      <div class="parent-dam">
-        <div class="lbl" style="color:#F9A8D4;">Mère (Génitrice)</div>
-        <div class="val">{mother_label}</div>
+
+      <div class="hero-subject">
+        {avatar_html}
+        <div class="subject-info">
+          <div class="doc-kicker">Certificat Officiel d'Origine, de Lignée & de Performances</div>
+          <h1 class="subject-name">{animal.name}</h1>
+          <div class="pills">
+            <span class="pill pill-gold">{breed_name}</span>
+            <span class="pill">{sex_code}</span>
+            <span class="pill">ID : {animal.id}</span>
+            <span class="pill">Boucle : {tag_label}</span>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="footer">Certifié via la plateforme Jur-gui — Élevage Intelligent Dakar</div>
+
+    <!-- BANDEAU LIGNÉE / SANG -->
+    <div class="lineage-strip">
+      <div>
+        <div class="lineage-strip-lbl">Lignée / Famille Génétique Certifiée</div>
+        <div class="lineage-strip-val">{lineage_label}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="lineage-strip-lbl">Statut Reproducteur</div>
+        <div style="font-size:14px;font-weight:800;color:{cond_color};">{repro_label}</div>
+      </div>
+    </div>
+
+    <div class="cert-body">
+      <!-- 01. IDENTIFICATION & SIGNALEMENT -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-num">01</span>
+          <div>
+            <h2>Identification & Signalement Zootechnique</h2>
+            <p>Données officielles d'enregistrement individuel et de traçabilité</p>
+          </div>
+        </div>
+        <div class="spec-grid">
+          <div class="spec-card">
+            <div class="spec-lbl">Identifiant Registre</div>
+            <div class="spec-val">{animal.id}</div>
+          </div>
+          <div class="spec-card">
+            <div class="spec-lbl">Boucle / Bague Officielle</div>
+            <div class="spec-val">{tag_label}</div>
+          </div>
+          <div class="spec-card">
+            <div class="spec-lbl">Race & Standard</div>
+            <div class="spec-val">{breed_name}</div>
+          </div>
+          <div class="spec-card">
+            <div class="spec-lbl">Sexe</div>
+            <div class="spec-val">{sex_label}</div>
+          </div>
+          <div class="spec-card">
+            <div class="spec-lbl">Date de Naissance</div>
+            <div class="spec-val">{birth_str} ({age_str})</div>
+          </div>
+          <div class="spec-card">
+            <div class="spec-lbl">Origine</div>
+            <div class="spec-val">{origin_label}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 02. ARBRE GÉNÉALOGIQUE (ASCENDANCE SUR 2 GÉNÉRATIONS) -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-num">02</span>
+          <div>
+            <h2>Arbre Généalogique & Ascendance (Parents & Grands-Parents)</h2>
+            <p>Filiation paternelle (Sire) et maternelle (Dam) certifiée</p>
+          </div>
+        </div>
+        <div class="pedigree-tree">
+          <!-- Génération I : Parents -->
+          <div class="gen-col">
+            <div class="tree-card tree-sire">
+              <div class="role-tag role-sire">♂ Père (Géniteur / Sire)</div>
+              {sire_html}
+            </div>
+            <div class="tree-card tree-dam">
+              <div class="role-tag role-dam">♀ Mère (Génitrice / Dam)</div>
+              {dam_html}
+            </div>
+          </div>
+          <!-- Génération II : Grands-Parents -->
+          <div class="gen-col">
+            <div class="tree-card tree-gp">
+              <div class="role-tag role-gp">♂ Grand-Père Paternel</div>
+              {pgf_html}
+            </div>
+            <div class="tree-card tree-gp">
+              <div class="role-tag role-gp">♀ Grand-Mère Paternelle</div>
+              {pgm_html}
+            </div>
+            <div class="tree-card tree-gp">
+              <div class="role-tag role-gp">♂ Grand-Père Maternel</div>
+              {mgf_html}
+            </div>
+            <div class="tree-card tree-gp">
+              <div class="role-tag role-gp">♀ Grand-Mère Maternelle</div>
+              {mgm_html}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 03. PERFORMANCES PONDERALES & MORPHOLOGIE -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-num">03</span>
+          <div>
+            <h2>Performances Pondérales & État Corporel</h2>
+            <p>Suivi de croissance et conformation morphologique</p>
+          </div>
+        </div>
+        <div class="spec-grid">
+          <div class="spec-card">
+            <div class="spec-lbl">Poids Actuel Certifié</div>
+            <div class="spec-val" style="color:var(--forest);font-size:18px;">{current_weight_str}</div>
+          </div>
+          <div class="spec-card">
+            <div class="spec-lbl">Première Pesée</div>
+            <div class="spec-val">{initial_weight_str}</div>
+          </div>
+          <div class="spec-card">
+            <div class="spec-lbl">Évolution Pondérale</div>
+            <div class="spec-val">{weight_gain_str}</div>
+          </div>
+          <div class="spec-card">
+            <div class="spec-lbl">Note d'État Corporel</div>
+            <div class="spec-val">{cond_label}</div>
+          </div>
+        </div>
+        {weights_table_html}
+      </div>
+
+      <!-- 04. DESCENDANCE -->
+      {offspring_section}
+    </div>
+
+    <!-- PIED DE PAGE CERTIFICATION -->
+    <div class="cert-footer">
+      <div class="stamp">✓ Fiche Généalogique Vérifiée • Jur-gui Dakar</div>
+      <div>Édité le {issued_date} • Réf. {cert_ref}</div>
+    </div>
   </div>
 </body>
 </html>"""

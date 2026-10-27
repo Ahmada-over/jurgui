@@ -292,16 +292,27 @@ class AnimalGenealogy {
   final Animal animal;
   final AnimalParentSummary? mother;
   final AnimalParentSummary? father;
+  final AnimalParentSummary? paternalGrandfather;
+  final AnimalParentSummary? paternalGrandmother;
+  final AnimalParentSummary? maternalGrandfather;
+  final AnimalParentSummary? maternalGrandmother;
   final List<AnimalParentSummary> offspring;
 
   AnimalGenealogy({
     required this.animal,
     this.mother,
     this.father,
+    this.paternalGrandfather,
+    this.paternalGrandmother,
+    this.maternalGrandfather,
+    this.maternalGrandmother,
     this.offspring = const [],
   });
 
   factory AnimalGenealogy.fromJson(Map<String, dynamic> json) {
+    final patGp = json['paternal_grandparents'] as Map<String, dynamic>?;
+    final matGp = json['maternal_grandparents'] as Map<String, dynamic>?;
+
     return AnimalGenealogy(
       animal: Animal.fromJson(json['animal'] as Map<String, dynamic>),
       mother: json['mother'] != null
@@ -309,6 +320,26 @@ class AnimalGenealogy {
           : null,
       father: json['father'] != null
           ? AnimalParentSummary.fromJson(json['father'] as Map<String, dynamic>)
+          : null,
+      paternalGrandfather: patGp?['father'] != null
+          ? AnimalParentSummary.fromJson(
+              patGp!['father'] as Map<String, dynamic>,
+            )
+          : null,
+      paternalGrandmother: patGp?['mother'] != null
+          ? AnimalParentSummary.fromJson(
+              patGp!['mother'] as Map<String, dynamic>,
+            )
+          : null,
+      maternalGrandfather: matGp?['father'] != null
+          ? AnimalParentSummary.fromJson(
+              matGp!['father'] as Map<String, dynamic>,
+            )
+          : null,
+      maternalGrandmother: matGp?['mother'] != null
+          ? AnimalParentSummary.fromJson(
+              matGp!['mother'] as Map<String, dynamic>,
+            )
           : null,
       offspring: (json['offspring'] as List<dynamic>?)
               ?.map(

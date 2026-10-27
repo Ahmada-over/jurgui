@@ -2,7 +2,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import selectinload, joinedload
 from app.core.database import get_db
 from app.models.animal import Animal, AnimalMovement, WeightRecord, BodyConditionRecord
@@ -306,39 +306,7 @@ async def get_animal_genealogy(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    query = (
-        select(Animal)
-        .options(
-            selectinload(Animal.breed),
-            selectinload(Animal.current_sector),
-            selectinload(Animal.mother).selectinload(Animal.breed),
-            selectinload(Animal.father).selectinload(Animal.breed),
-        )
-        .where(Animal.id == animal_id)
-    )
-    result = await db.execute(query)
-    animal = result.scalars().first()
-    if not animal:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Animal introuvable")
-
-    # Fetch direct offspring
-    offspring_res = await db.execute(
-        select(Animal)
-        .options(selectinload(Animal.breed))
-        .where(or_(Animal.mother_id == animal.id, Animal.father_id == animal.id))
-    )
-    offspring_list = offspring_res.scalars().all()
-
-    mother_out = AnimalParentOut.model_validate(animal.mother) if animal.mother else None
-    father_out = AnimalParentOut.model_validate(animal.father) if animal.father else None
-    offspring_out = [AnimalParentOut.model_validate(o) for o in offspring_list]
-
-    return AnimalGenealogyOut(
-        animal=AnimalOut.model_validate(animal),
-        mother=mother_out,
-        father=father_out,
-        offspring=offspring_out
-    )
+    return await _build_genealogy_out(animal_id, db)
 
 
 @router.get("/{animal_id}/public-pedigree", response_model=AnimalGenealogyOut)
@@ -346,16 +314,24 @@ async def get_public_animal_pedigree(
     animal_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Fiche publique de lignée & pedigree partageable entre éleveurs."""
+    """Fiche publique de lignée & pedigree partageable entre éleveurs (avec grands-parents et descendance)."""
+    return await _build_genealogy_out(animal_id, db)
+
+
+async def _build_genealogy_out(animal_id: str, db: AsyncSession) -> AnimalGenealogyOut:
     query = (
         select(Animal)
         .options(
             selectinload(Animal.breed),
             selectinload(Animal.current_sector),
             selectinload(Animal.mother).selectinload(Animal.breed),
+            selectinload(Animal.mother).selectinload(Animal.father).selectinload(Animal.breed),
+            selectinload(Animal.mother).selectinload(Animal.mother).selectinload(Animal.breed),
             selectinload(Animal.father).selectinload(Animal.breed),
+            selectinload(Animal.father).selectinload(Animal.father).selectinload(Animal.breed),
+            selectinload(Animal.father).selectinload(Animal.mother).selectinload(Animal.breed),
         )
-        .where(Animal.id == animal_id)
+        .where(func.lower(Animal.id) == animal_id.strip().lower())
     )
     result = await db.execute(query)
     animal = result.scalars().first()
@@ -369,13 +345,54 @@ async def get_public_animal_pedigree(
         select(Animal)
         .options(selectinload(Animal.breed))
         .where(or_(Animal.mother_id == animal.id, Animal.father_id == animal.id))
+        .order_by(Animal.birth_date.desc())
     )
     offspring_list = offspring_res.scalars().all()
+
+    paternal_gp = None
+    if animal.father:
+        paternal_gp = {
+            "father": AnimalParentOut.model_validate(animal.father.father).model_dump()
+            if animal.father.father
+            else (
+                {"id": animal.father.father_id, "name": animal.father.father_id, "sex": "male"}
+                if animal.father.father_id
+                else None
+            ),
+            "mother": AnimalParentOut.model_validate(animal.father.mother).model_dump()
+            if animal.father.mother
+            else (
+                {"id": animal.father.mother_id, "name": animal.father.mother_id, "sex": "female"}
+                if animal.father.mother_id
+                else None
+            ),
+        }
+
+    maternal_gp = None
+    if animal.mother:
+        maternal_gp = {
+            "father": AnimalParentOut.model_validate(animal.mother.father).model_dump()
+            if animal.mother.father
+            else (
+                {"id": animal.mother.father_id, "name": animal.mother.father_id, "sex": "male"}
+                if animal.mother.father_id
+                else None
+            ),
+            "mother": AnimalParentOut.model_validate(animal.mother.mother).model_dump()
+            if animal.mother.mother
+            else (
+                {"id": animal.mother.mother_id, "name": animal.mother.mother_id, "sex": "female"}
+                if animal.mother.mother_id
+                else None
+            ),
+        }
 
     return AnimalGenealogyOut(
         animal=AnimalOut.model_validate(animal),
         mother=AnimalParentOut.model_validate(animal.mother) if animal.mother else None,
         father=AnimalParentOut.model_validate(animal.father) if animal.father else None,
+        paternal_grandparents=paternal_gp,
+        maternal_grandparents=maternal_gp,
         offspring=[AnimalParentOut.model_validate(o) for o in offspring_list],
     )
 

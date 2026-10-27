@@ -7,17 +7,53 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/error_retry_card.dart';
 import '../../core/widgets/sheep_hoof_icon.dart';
 import '../../models/dashboard.dart';
+import '../../models/reproduction.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
+import '../../providers/reproduction_provider.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
+  List<UpcomingBirth> _mergeActiveBirths(
+    DashboardData? data,
+    List<Pregnancy>? pregnancies,
+  ) {
+    final map = <int, UpcomingBirth>{};
+    if (data != null) {
+      for (final b in data.upcomingBirths) {
+        map[b.pregnancyId] = b;
+      }
+    }
+    if (pregnancies != null) {
+      for (final p in pregnancies) {
+        if (p.status == 'in_progress') {
+          final expectedStr =
+              '${p.expectedBirthDate.year}-${p.expectedBirthDate.month.toString().padLeft(2, '0')}-${p.expectedBirthDate.day.toString().padLeft(2, '0')}';
+          map[p.id] = UpcomingBirth(
+            pregnancyId: p.id,
+            femaleId: p.femaleId,
+            expectedDate: expectedStr,
+            daysLeft: p.daysRemaining,
+          );
+        }
+      }
+    }
+    final list = map.values.toList()
+      ..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
+    return list;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardProvider);
+    final pregnanciesAsync = ref.watch(pregnanciesProvider);
     final authState = ref.watch(authProvider);
     final userName = authState.user?['full_name'] ?? 'Administrateur';
+    final effectiveBirths = _mergeActiveBirths(
+      dashboardAsync.value,
+      pregnanciesAsync.value,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -25,7 +61,10 @@ class DashboardScreen extends ConsumerWidget {
         bottom: false,
         child: RefreshIndicator(
           color: AppColors.primaryAccent,
-          onRefresh: () async => ref.refresh(dashboardProvider),
+          onRefresh: () async {
+            ref.invalidate(pregnanciesProvider);
+            return ref.refresh(dashboardProvider);
+          },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
@@ -76,7 +115,11 @@ class DashboardScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      _buildNotificationBellButton(context, dashboardAsync.value),
+                      _buildNotificationBellButton(
+                        context,
+                        dashboardAsync.value,
+                        effectiveBirths,
+                      ),
                     ],
                   ),
                 ),
@@ -100,7 +143,7 @@ class DashboardScreen extends ConsumerWidget {
                 data: (data) => SliverList(
                   delegate: SliverChildListDelegate([
                     // 1. BANDEAU FERME & ALERTE DU JOUR
-                    _buildFarmAlertBanner(context, data),
+                    _buildFarmAlertBanner(context, data, effectiveBirths),
                     const SizedBox(height: 16),
 
                     // 2. TROIS BOUTONS D'ACTION FIXES (pas de défilement, sans Profil)
@@ -110,17 +153,21 @@ class DashboardScreen extends ConsumerWidget {
                     // 3. QUATRE TUILES OPÉRATIONNELLES (avec états réels et écrans branchés)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildOperationalGrid(context, data),
+                      child: _buildOperationalGrid(
+                        context,
+                        data,
+                        effectiveBirths,
+                      ),
                     ),
                     const SizedBox(height: 24),
 
-                    // 4. MISES BAS IMMINENTES
-                    if (data.upcomingBirths.isNotEmpty) ...[
+                    // 4. MISES BAS & GESTATIONS SUIVIES
+                    if (effectiveBirths.isNotEmpty) ...[
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: _buildUpcomingBirthsSection(
                           context,
-                          data.upcomingBirths,
+                          effectiveBirths,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -153,6 +200,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildNotificationBellButton(
     BuildContext context,
     DashboardData? data,
+    List<UpcomingBirth> effectiveBirths,
   ) {
     final saturatedCount = data?.sectors
             .where(
@@ -162,11 +210,12 @@ class DashboardScreen extends ConsumerWidget {
             )
             .length ??
         0;
-    final birthAlertsCount = data?.upcomingBirths.length ?? 0;
+    final birthAlertsCount = effectiveBirths.isNotEmpty
+        ? effectiveBirths.length
+        : (data?.activePregnancies ?? 0);
     final totalAlerts = birthAlertsCount + saturatedCount;
-    final hasUrgent = (data?.upcomingBirths.any((b) => b.daysLeft <= 7) ??
-            false) ||
-        saturatedCount > 0;
+    final hasUrgent =
+        effectiveBirths.any((b) => b.daysLeft <= 7) || saturatedCount > 0;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -175,7 +224,8 @@ class DashboardScreen extends ConsumerWidget {
           color: totalAlerts > 0 ? AppColors.goldLight : Colors.white,
           borderRadius: BorderRadius.circular(15),
           child: InkWell(
-            onTap: () => _showNotificationsSheet(context, data),
+            onTap: () =>
+                _showNotificationsSheet(context, data, effectiveBirths),
             borderRadius: BorderRadius.circular(15),
             child: Container(
               width: 46,
@@ -226,8 +276,12 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   /// Feuille modale des notifications utilisant les couleurs vives de l'accueil
-  void _showNotificationsSheet(BuildContext context, DashboardData? data) {
-    final births = [...(data?.upcomingBirths ?? <UpcomingBirth>[])]
+  void _showNotificationsSheet(
+    BuildContext context,
+    DashboardData? data,
+    List<UpcomingBirth> effectiveBirths,
+  ) {
+    final births = [...effectiveBirths]
       ..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
     final saturatedSectors = (data?.sectors ?? <SectorStat>[])
         .where(
@@ -469,8 +523,12 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   /// Bandeau vert forêt : affiche le nom de la ferme et la seule alerte prioritaire du jour avec couleurs vives
-  Widget _buildFarmAlertBanner(BuildContext context, DashboardData data) {
-    final sortedBirths = [...data.upcomingBirths]
+  Widget _buildFarmAlertBanner(
+    BuildContext context,
+    DashboardData data,
+    List<UpcomingBirth> effectiveBirths,
+  ) {
+    final sortedBirths = [...effectiveBirths]
       ..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
     final urgentBirth = sortedBirths.isNotEmpty ? sortedBirths.first : null;
     final saturatedSector = data.sectors
@@ -502,9 +560,15 @@ class DashboardScreen extends ConsumerWidget {
       onAlertTap = () => context.go('/animals');
     } else if (urgentBirth != null) {
       alertText =
-          'Prochaine mise bas dans ${urgentBirth.daysLeft} jours (${urgentBirth.femaleId})';
+          'Gestation suivie : Brebis ${urgentBirth.femaleId} (terme J-${urgentBirth.daysLeft})';
       alertIcon = LucideIcons.calendarClock;
-      alertIconColor = AppColors.goldDark;
+      alertIconColor = const Color(0xFFC2410C);
+      onAlertTap = () => context.go('/reproduction');
+    } else if (data.activePregnancies > 0) {
+      alertText =
+          '${data.activePregnancies} gestation${data.activePregnancies > 1 ? "s" : ""} en suivi — Voir le calendrier';
+      alertIcon = LucideIcons.heart;
+      alertIconColor = const Color(0xFFC2410C);
       onAlertTap = () => context.go('/reproduction');
     } else {
       hasAlert = false;
@@ -718,11 +782,15 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   /// Grille des indicateurs avec les couleurs vives d'accueil et pastilles d'état réel
-  Widget _buildOperationalGrid(BuildContext context, DashboardData data) {
+  Widget _buildOperationalGrid(
+    BuildContext context,
+    DashboardData data,
+    List<UpcomingBirth> effectiveBirths,
+  ) {
     final hasSaturatedSector = data.sectors.any(
       (s) => s.isOvercrowded || (s.capacity > 0 && s.occupancy >= s.capacity),
     );
-    final hasImminentBirth = data.upcomingBirths.any((b) => b.daysLeft <= 7);
+    final hasImminentBirth = effectiveBirths.any((b) => b.daysLeft <= 7);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
