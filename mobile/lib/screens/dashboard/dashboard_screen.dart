@@ -24,30 +24,31 @@ class DashboardScreen extends ConsumerWidget {
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          color: AppColors.primary,
+          color: AppColors.primaryAccent,
           onRefresh: () async => ref.refresh(dashboardProvider),
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
             slivers: [
-              // En-tête sobre et lisible
+              // En-tête avec identité couleur & cloche de notifications
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                   child: Row(
                     children: [
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 46,
+                        height: 46,
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(14),
+                          gradient: AppColors.heroGradient,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: AppColors.softShadow,
                         ),
                         child: const Center(
                           child: SheepHoofIcon(
-                            color: Colors.white,
-                            size: 22,
+                            color: AppColors.gold,
+                            size: 24,
                           ),
                         ),
                       ),
@@ -75,6 +76,7 @@ class DashboardScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
+                      _buildNotificationBellButton(context, dashboardAsync.value),
                     ],
                   ),
                 ),
@@ -85,7 +87,7 @@ class DashboardScreen extends ConsumerWidget {
                 loading: () => const SliverFillRemaining(
                   child: Center(
                     child: CircularProgressIndicator(
-                      color: AppColors.primary,
+                      color: AppColors.primaryAccent,
                     ),
                   ),
                 ),
@@ -147,7 +149,326 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// Bandeau vert forêt : affiche le nom de la ferme et la seule alerte prioritaire du jour en blanc plein
+  /// Cloche de notifications en haut à droite avec pastille vive pour attirer l'attention
+  Widget _buildNotificationBellButton(
+    BuildContext context,
+    DashboardData? data,
+  ) {
+    final saturatedCount = data?.sectors
+            .where(
+              (s) =>
+                  s.isOvercrowded ||
+                  (s.capacity > 0 && s.occupancy >= s.capacity),
+            )
+            .length ??
+        0;
+    final birthAlertsCount = data?.upcomingBirths.length ?? 0;
+    final totalAlerts = birthAlertsCount + saturatedCount;
+    final hasUrgent = (data?.upcomingBirths.any((b) => b.daysLeft <= 7) ??
+            false) ||
+        saturatedCount > 0;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: totalAlerts > 0 ? AppColors.goldLight : Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          child: InkWell(
+            onTap: () => _showNotificationsSheet(context, data),
+            borderRadius: BorderRadius.circular(15),
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: totalAlerts > 0
+                      ? AppColors.gold.withValues(alpha: 0.65)
+                      : AppColors.divider,
+                  width: 1.3,
+                ),
+                boxShadow: AppColors.softShadow,
+              ),
+              child: Icon(
+                totalAlerts > 0 ? LucideIcons.bellRing : LucideIcons.bell,
+                size: 21,
+                color: totalAlerts > 0
+                    ? const Color(0xFFC2410C)
+                    : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
+        if (totalAlerts > 0)
+          Positioned(
+            right: -3,
+            top: -3,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: hasUrgent ? AppColors.danger : const Color(0xFFC2410C),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 1.8),
+              ),
+              child: Text(
+                '$totalAlerts',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Feuille modale des notifications utilisant les couleurs vives de l'accueil
+  void _showNotificationsSheet(BuildContext context, DashboardData? data) {
+    final births = [...(data?.upcomingBirths ?? <UpcomingBirth>[])]
+      ..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
+    final saturatedSectors = (data?.sectors ?? <SectorStat>[])
+        .where(
+          (s) =>
+              s.isOvercrowded || (s.capacity > 0 && s.occupancy >= s.capacity),
+        )
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.divider,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.goldGradient,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        LucideIcons.bellRing,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Notifications & Alertes',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'Suivi en temps réel du cheptel et des mises bas',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                if (births.isEmpty && saturatedSectors.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryContainer,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          LucideIcons.circleCheck,
+                          color: AppColors.primaryAccent,
+                          size: 22,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Aucune alerte en attente. Tout le cheptel est calme.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  ...births.map((b) {
+                    final isUrgent = b.daysLeft <= 7;
+                    final accent = isUrgent
+                        ? const Color(0xFFC2410C)
+                        : AppColors.goldDark;
+                    final bg = isUrgent
+                        ? const Color(0xFFFFF7ED)
+                        : AppColors.goldLight;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: bg,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: accent.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: ListTile(
+                        onTap: () {
+                          Navigator.pop(sheetCtx);
+                          context.go('/reproduction');
+                        },
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: accent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            LucideIcons.baby,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                        title: Text(
+                          'Mise bas — Brebis ${b.femaleId}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Terme prévu le ${b.expectedDate}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isUrgent ? AppColors.danger : accent,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            b.daysLeft <= 0 ? 'Aujourd\'hui' : 'J-${b.daysLeft}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  ...saturatedSectors.map(
+                    (s) => Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: AppColors.danger.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: ListTile(
+                        onTap: () {
+                          Navigator.pop(sheetCtx);
+                          context.go('/animals');
+                        },
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.danger,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            LucideIcons.doorOpen,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                        title: Text(
+                          'Enclos saturé : ${s.sectorName}',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Occupation : ${s.occupancy} / ${s.capacity} places',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          LucideIcons.chevronRight,
+                          color: AppColors.danger,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Bandeau vert forêt : affiche le nom de la ferme et la seule alerte prioritaire du jour avec couleurs vives
   Widget _buildFarmAlertBanner(BuildContext context, DashboardData data) {
     final sortedBirths = [...data.upcomingBirths]
       ..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
@@ -161,6 +482,7 @@ class DashboardScreen extends ConsumerWidget {
 
     String alertText;
     IconData alertIcon;
+    Color alertIconColor;
     VoidCallback? onAlertTap;
     bool hasAlert = true;
 
@@ -170,21 +492,25 @@ class DashboardScreen extends ConsumerWidget {
           ? 'Mise bas aujourd\'hui — Brebis ${urgentBirth.femaleId}'
           : 'Mise bas dans $days jour${days > 1 ? "s" : ""} — Brebis ${urgentBirth.femaleId}';
       alertIcon = LucideIcons.baby;
+      alertIconColor = const Color(0xFFC2410C);
       onAlertTap = () => context.go('/reproduction');
     } else if (saturatedSector != null) {
       alertText =
           'Enclos saturé : ${saturatedSector.sectorName} (${saturatedSector.occupancy}/${saturatedSector.capacity})';
       alertIcon = LucideIcons.doorOpen;
+      alertIconColor = AppColors.danger;
       onAlertTap = () => context.go('/animals');
     } else if (urgentBirth != null) {
       alertText =
           'Prochaine mise bas dans ${urgentBirth.daysLeft} jours (${urgentBirth.femaleId})';
       alertIcon = LucideIcons.calendarClock;
+      alertIconColor = AppColors.goldDark;
       onAlertTap = () => context.go('/reproduction');
     } else {
       hasAlert = false;
       alertText = 'Aucune alerte critique aujourd\'hui — Élevage calme';
       alertIcon = LucideIcons.check;
+      alertIconColor = AppColors.primaryAccent;
       onAlertTap = null;
     }
 
@@ -192,28 +518,58 @@ class DashboardScreen extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         gradient: AppColors.heroGradient,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: AppColors.softShadow,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: AppColors.floatingShadow,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onAlertTap,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(26),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Bergerie Jur-gui — Dakar',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 9,
+                          height: 9,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primaryAccent,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primaryAccent,
+                                blurRadius: 6,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Bergerie Jur-gui — Dakar',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Icon(
+                      LucideIcons.activity,
+                      color: AppColors.gold,
+                      size: 22,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -223,14 +579,28 @@ class DashboardScreen extends ConsumerWidget {
                     color: hasAlert
                         ? AppColors.goldLight
                         : Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
+                    border: hasAlert
+                        ? Border.all(
+                            color: AppColors.gold.withValues(alpha: 0.6),
+                          )
+                        : null,
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        alertIcon,
-                        size: 20,
-                        color: hasAlert ? AppColors.primary : Colors.white,
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: hasAlert
+                              ? alertIconColor.withValues(alpha: 0.14)
+                              : Colors.white.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          alertIcon,
+                          size: 18,
+                          color: hasAlert ? alertIconColor : Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -249,9 +619,7 @@ class DashboardScreen extends ConsumerWidget {
                         Icon(
                           LucideIcons.chevronRight,
                           size: 18,
-                          color: hasAlert
-                              ? AppColors.textPrimary
-                              : Colors.white,
+                          color: hasAlert ? alertIconColor : Colors.white,
                         ),
                     ],
                   ),
@@ -264,7 +632,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// Trois boutons fixes de saisie (Nouvel ovin, Saillie, Mise bas) — pas de défilement
+  /// Trois boutons fixes de saisie avec leurs couleurs distinctives d'origine
   Widget _buildFixedQuickActions(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -274,6 +642,7 @@ class DashboardScreen extends ConsumerWidget {
             child: _buildFixedActionButton(
               icon: LucideIcons.plus,
               label: 'Nouvel ovin',
+              color: AppColors.primary,
               onTap: () => context.push('/animals/add'),
             ),
           ),
@@ -282,6 +651,7 @@ class DashboardScreen extends ConsumerWidget {
             child: _buildFixedActionButton(
               icon: LucideIcons.heart,
               label: 'Saillie',
+              color: AppColors.goldDark,
               onTap: () => context.push('/reproduction/mating'),
             ),
           ),
@@ -290,6 +660,7 @@ class DashboardScreen extends ConsumerWidget {
             child: _buildFixedActionButton(
               icon: LucideIcons.baby,
               label: 'Mise bas',
+              color: const Color(0xFFC2410C),
               onTap: () => context.push('/reproduction/birth'),
             ),
           ),
@@ -301,19 +672,20 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildFixedActionButton({
     required IconData icon,
     required String label,
+    required Color color,
     required VoidCallback onTap,
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.divider),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: color.withValues(alpha: 0.22)),
             boxShadow: AppColors.softShadow,
           ),
           child: Column(
@@ -322,10 +694,10 @@ class DashboardScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
+                  color: color.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, size: 18, color: AppColors.primary),
+                child: Icon(icon, size: 18, color: color),
               ),
               const SizedBox(height: 6),
               Text(
@@ -345,7 +717,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// Grille des indicateurs avec pastilles d'état réel uniquement (sans les modules masqués)
+  /// Grille des indicateurs avec les couleurs vives d'accueil et pastilles d'état réel
   Widget _buildOperationalGrid(BuildContext context, DashboardData data) {
     final hasSaturatedSector = data.sectors.any(
       (s) => s.isOvercrowded || (s.capacity > 0 && s.occupancy >= s.capacity),
@@ -373,8 +745,9 @@ class DashboardScreen extends ConsumerWidget {
                 unit: 'têtes',
                 customIcon: const SheepHoofIcon(
                   size: 20,
-                  color: AppColors.primary,
+                  color: AppColors.primaryAccent,
                 ),
+                accentColor: AppColors.primaryAccent,
                 badgeText: data.totalActiveAnimals > 0 ? 'Recensé' : 'Vide',
                 isAlert: false,
                 onTap: () => context.go('/animals'),
@@ -387,6 +760,7 @@ class DashboardScreen extends ConsumerWidget {
                 value: '${data.activePregnancies}',
                 unit: 'suivies',
                 icon: LucideIcons.heart,
+                accentColor: AppColors.goldDark,
                 badgeText: hasImminentBirth
                     ? 'Imminent'
                     : (data.activePregnancies > 0 ? 'En cours' : 'Calme'),
@@ -402,6 +776,7 @@ class DashboardScreen extends ConsumerWidget {
           value: '${data.sectors.length}',
           unit: 'enclos actifs',
           icon: LucideIcons.layoutGrid,
+          accentColor: AppColors.info,
           badgeText: hasSaturatedSector ? 'Saturé' : 'Calme',
           isAlert: hasSaturatedSector,
           onTap: () => context.go('/animals'),
@@ -416,14 +791,14 @@ class DashboardScreen extends ConsumerWidget {
     required String unit,
     IconData? icon,
     Widget? customIcon,
+    required Color accentColor,
     required String badgeText,
     required bool isAlert,
     required VoidCallback onTap,
   }) {
-    final badgeBg = isAlert
-        ? AppColors.danger.withValues(alpha: 0.12)
-        : AppColors.primaryContainer;
-    final badgeFg = isAlert ? AppColors.danger : AppColors.primary;
+    final effectiveAccent = isAlert ? AppColors.danger : accentColor;
+    final badgeBg = effectiveAccent.withValues(alpha: 0.14);
+    final badgeFg = effectiveAccent;
 
     return Material(
       color: Colors.white,
@@ -451,12 +826,12 @@ class DashboardScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryContainer,
+                      color: accentColor.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child:
                         customIcon ??
-                        Icon(icon, size: 20, color: AppColors.primary),
+                        Icon(icon, size: 20, color: accentColor),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -531,7 +906,7 @@ class DashboardScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppColors.goldLight,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.45)),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,7 +919,7 @@ class DashboardScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
+                      color: AppColors.gold,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -571,7 +946,7 @@ class DashboardScreen extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: AppColors.goldDark,
                   ),
                 ),
               ),
@@ -636,8 +1011,8 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     decoration: BoxDecoration(
                       color: b.daysLeft <= 7
-                          ? AppColors.danger.withValues(alpha: 0.12)
-                          : AppColors.primaryContainer,
+                          ? AppColors.danger.withValues(alpha: 0.14)
+                          : AppColors.primaryAccent.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -647,7 +1022,7 @@ class DashboardScreen extends ConsumerWidget {
                         fontWeight: FontWeight.w700,
                         color: b.daysLeft <= 7
                             ? AppColors.danger
-                            : AppColors.primary,
+                            : AppColors.primaryAccent,
                       ),
                     ),
                   ),
